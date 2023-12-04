@@ -11,49 +11,51 @@ pub fn main() !void {
         var first: u8 = std.math.maxInt(u8);
         var last: u8 = std.math.maxInt(u8);
 
-        for (line, 0..) |char, i| {
-            var number: u8 = char - '0';
-            if (isSpelledNumber(line[i..])) |n| {
-                number = n;
-            }
-
-            if (number >= 0 and number <= 9) {
-                if (first == std.math.maxInt(u8)) {
-                    // First number
-                    first = number;
-                    last = first;
-                } else {
-                    // Second number
-                    last = number;
+        var i: usize = 0;
+        while (i < line.len) {
+            var number = b: {
+                if (isSpelledNumber(line[i..])) |spelled| {
+                    i += spelled.advance;
+                    break :b spelled.number;
                 }
+                i += 1;
+                break :b line[i] - '0';
+            };
+            // number >= 1 is implicitly true
+            if (number <= 9) {
+                if (first == std.math.maxInt(u8)) {
+                    first = number;
+                    last = number;
+                    continue;
+                }
+                last = number;
             }
         }
-        const value = first * 10 + last;
-        std.debug.print("{}\n", .{value});
-        sum += value;
+        sum += first * 10 + last;
     }
     std.debug.print("{}\n", .{sum});
 }
 
-fn isSpelledNumber(string: []const u8) ?u8 {
+const SpelledResult = struct { number: u8, advance: u8 };
+fn isSpelledNumber(string: []const u8) ?SpelledResult {
     return if (std.mem.indexOf(u8, string, "one") == 0)
-        1
+        .{ .number = 1, .advance = 3 }
     else if (std.mem.indexOf(u8, string, "two") == 0)
-        2
+        .{ .number = 2, .advance = 3 }
     else if (std.mem.indexOf(u8, string, "three") == 0)
-        3
+        .{ .number = 3, .advance = 5 }
     else if (std.mem.indexOf(u8, string, "four") == 0)
-        4
+        .{ .number = 4, .advance = 4 }
     else if (std.mem.indexOf(u8, string, "five") == 0)
-        5
+        .{ .number = 5, .advance = 4 }
     else if (std.mem.indexOf(u8, string, "six") == 0)
-        6
+        .{ .number = 6, .advance = 3 }
     else if (std.mem.indexOf(u8, string, "seven") == 0)
-        7
+        .{ .number = 7, .advance = 5 }
     else if (std.mem.indexOf(u8, string, "eight") == 0)
-        8
+        .{ .number = 8, .advance = 5 }
     else if (std.mem.indexOf(u8, string, "nine") == 0)
-        9
+        .{ .number = 9, .advance = 4 }
     else
         null;
 }
