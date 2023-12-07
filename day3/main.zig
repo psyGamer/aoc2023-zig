@@ -9,6 +9,7 @@ const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
+const Array2D = @import("array2d.zig").Array2D;
 const Part = enum { one, two };
 
 pub fn main() !void {
@@ -31,63 +32,86 @@ fn digitListToNumber(nums: std.ArrayList(u8)) u32 {
     }
     return result;
 }
+fn useMapValue(map: Array2D(i32), x: usize, y: usize) u32 {
+    const value = map.get(x, y);
+
+    // Remove values to the left
+    var nx = x;
+    while (nx > 0) {
+        nx -= 1;
+        if (map.get(nx, y) != value) break;
+        map.set(nx, y, 0);
+    }
+    // Remove values to the right
+    nx = x;
+    while (nx < map.width - 1) {
+        nx += 1;
+        if (map.get(nx, y) != value) break;
+        map.set(nx, y, 0);
+    }
+
+    return @max(0, value);
+}
 
 fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
-    var result: u32 = 0;
     _ = part;
+    var result: u32 = 0;
     const width = indexOf(u8, in, '\n').? + 1;
     const height = in.len / width;
 
+    var map = try Array2D(i32).initWithDefault(allocator, width - 1, height, 0);
+    defer map.deinit(allocator);
+    const symbol_value = -1; // Magic value for symbols
+
+    // Generate lookup map
     var nums = std.ArrayList(u8).init(allocator);
     defer nums.deinit();
-
-    for (0..height) |y| {
-        nums.clearRetainingCapacity();
-
-        main_loop: for (0..width) |x| {
+    for (0..map.height) |y| {
+        for (0..width) |x| {
             const char = getAtPos(x, y, width, in);
             if (std.ascii.isDigit(char)) {
                 try nums.append(char);
-            } else if (nums.items.len > 0) {
+            } else {
                 if (char != '.' and char != '\n') {
-                    result += digitListToNumber(nums);
-                    nums.clearRetainingCapacity();
-                    continue :main_loop;
-                } else {
-                    // Above
-                    const start_x = @max(0, x -| nums.items.len -| 1);
-                    const end_x = @min(width - 1, x + 1);
-                    if (y >= 1) {
-                        for (start_x..end_x) |nx| {
-                            if (getAtPos(nx, y - 1, width, in) != '.') {
-                                result += digitListToNumber(nums);
-                                nums.clearRetainingCapacity();
-                                continue :main_loop;
-                            }
-                        }
-                    }
-                    // Below
-                    if (y < height - 1) {
-                        for (start_x..end_x) |nx| {
-                            if (getAtPos(nx, y + 1, width, in) != '.') {
-                                result += digitListToNumber(nums);
-                                nums.clearRetainingCapacity();
-                                continue :main_loop;
-                            }
-                        }
-                    }
-                    // Left
-                    if (x > nums.items.len) {
-                        if (getAtPos(start_x, y, width, in) != '.') {
-                            result += digitListToNumber(nums);
-                            nums.clearRetainingCapacity();
-                            continue :main_loop;
-                        }
-                    }
+                    map.set(x, y, symbol_value);
                 }
-                // Not valid
+
+                const value = digitListToNumber(nums);
+                var nx = x;
+                while (nx > 0 and nx > x -| nums.items.len) {
+                    nx -= 1;
+                    map.set(nx, y, @intCast(value));
+                }
                 nums.clearRetainingCapacity();
             }
+        }
+    }
+
+    for (0..map.height) |y| {
+        for (0..map.width) |x| {
+            const value = map.get(x, y);
+            if (value != symbol_value) continue;
+
+            const left_edge = x == 0;
+            const top_edge = y == 0;
+            const right_edge = x == map.width - 1;
+            const bottom_edge = y == map.height - 1;
+
+            // Above
+            if (!top_edge) {
+                if (!left_edge) result += useMapValue(map, x - 1, y - 1);
+                result += useMapValue(map, x, y - 1);
+                if (!right_edge) result += useMapValue(map, x + 1, y - 1);
+            }
+            // Below
+            if (!bottom_edge) {
+                if (!left_edge) result += useMapValue(map, x - 1, y + 1);
+                result += useMapValue(map, x, y + 1);
+                if (!right_edge) result += useMapValue(map, x + 1, y + 1);
+            }
+            // Center
+            if (!left_edge) result += useMapValue(map, x - 1, y);
+            if (!right_edge) result += useMapValue(map, x + 1, y);
         }
     }
 
