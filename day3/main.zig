@@ -54,7 +54,6 @@ fn useMapValue(map: Array2D(i32), x: usize, y: usize) u32 {
 }
 
 fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
-    _ = part;
     var result: u32 = 0;
     const width = indexOf(u8, in, '\n').? + 1;
     const height = in.len / width;
@@ -90,28 +89,59 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     for (0..map.height) |y| {
         for (0..map.width) |x| {
             const value = map.get(x, y);
-            if (value != symbol_value) continue;
+            if (value >= 0) continue;
 
             const left_edge = x == 0;
             const top_edge = y == 0;
             const right_edge = x == map.width - 1;
             const bottom_edge = y == map.height - 1;
 
-            // Above
-            if (!top_edge) {
-                if (!left_edge) result += useMapValue(map, x - 1, y - 1);
-                result += useMapValue(map, x, y - 1);
-                if (!right_edge) result += useMapValue(map, x + 1, y - 1);
+            if (part == .one) {
+                // Above
+                if (!top_edge) {
+                    if (!left_edge) result += useMapValue(map, x - 1, y - 1);
+                    result += useMapValue(map, x, y - 1);
+                    if (!right_edge) result += useMapValue(map, x + 1, y - 1);
+                }
+                // Below
+                if (!bottom_edge) {
+                    if (!left_edge) result += useMapValue(map, x - 1, y + 1);
+                    result += useMapValue(map, x, y + 1);
+                    if (!right_edge) result += useMapValue(map, x + 1, y + 1);
+                }
+                // Center
+                if (!left_edge) result += useMapValue(map, x - 1, y);
+                if (!right_edge) result += useMapValue(map, x + 1, y);
+            } else if (part == .two) {
+                var numbers = std.ArrayList(u32).init(allocator);
+                defer numbers.deinit();
+                // Above
+                if (!top_edge) {
+                    if (!left_edge) try numbers.append(useMapValue(map, x - 1, y - 1));
+                    try numbers.append(useMapValue(map, x, y - 1));
+                    if (!right_edge) try numbers.append(useMapValue(map, x + 1, y - 1));
+                }
+                // Below
+                if (!bottom_edge) {
+                    if (!left_edge) try numbers.append(useMapValue(map, x - 1, y + 1));
+                    try numbers.append(useMapValue(map, x, y + 1));
+                    if (!right_edge) try numbers.append(useMapValue(map, x + 1, y + 1));
+                }
+                // Center
+                if (!left_edge) try numbers.append(useMapValue(map, x - 1, y));
+                if (!right_edge) try numbers.append(useMapValue(map, x + 1, y));
+
+                var val: u32 = 1;
+                var next_to: usize = 0;
+                for (numbers.items) |num| {
+                    if (num != 0) {
+                        next_to += 1;
+                        val *= num;
+                    }
+                }
+
+                if (next_to == 2) result += val;
             }
-            // Below
-            if (!bottom_edge) {
-                if (!left_edge) result += useMapValue(map, x - 1, y + 1);
-                result += useMapValue(map, x, y + 1);
-                if (!right_edge) result += useMapValue(map, x + 1, y + 1);
-            }
-            // Center
-            if (!left_edge) result += useMapValue(map, x - 1, y);
-            if (!right_edge) result += useMapValue(map, x + 1, y);
         }
     }
 
