@@ -17,7 +17,8 @@ pub fn main() !void {
     const allocator = arena.allocator();
     _ = allocator;
 
-    std.log.info("Result: {}", .{try solve(.one, input)});
+    std.log.info("Result (Part 1): {}", .{try solve(.one, input)});
+    std.log.info("Result (Part 2): {}", .{try solve(.two, input)});
 }
 
 const Entry = struct {
@@ -50,7 +51,7 @@ const Entry = struct {
 };
 
 fn solve(part: Part, in: []const u8) !u32 {
-    var possible: u32 = 0;
+    var result: u32 = 0;
 
     var i: u32 = 1;
     var iter = tokenizeSca(u8, in, '\n');
@@ -59,36 +60,44 @@ fn solve(part: Part, in: []const u8) !u32 {
         const col_idx = indexOf(u8, line, ':').?;
         const trimmed_line = line[(col_idx + 2)..];
 
+        // Part 1
         const max_red = 12;
         const max_green = 13;
         const max_blue = 14;
-
         var all_possible = true;
+        // Part 2
+        var min_red: u32 = 0;
+        var min_green: u32 = 0;
+        var min_blue: u32 = 0;
 
         var entry_iter = splitSca(u8, trimmed_line, ';');
         while (entry_iter.next()) |entry_text| {
             const entry = try Entry.parse(trim(u8, entry_text, " "));
-            if (entry.red > max_red or entry.green > max_green or entry.blue > max_blue) {
+            if (part == .one and (entry.red > max_red or entry.green > max_green or entry.blue > max_blue)) {
                 all_possible = false;
                 break;
+            } else if (part == .two) {
+                min_red = @max(min_red, entry.red);
+                min_green = @max(min_green, entry.green);
+                min_blue = @max(min_blue, entry.blue);
             }
         }
 
-        if (all_possible) {
-            possible += i;
+        if (part == .one and all_possible) {
+            result += i;
+        } else if (part == .two) {
+            result += min_red * min_green * min_blue;
         }
     }
 
-    _ = part;
-    return possible;
+    return result;
 }
 
 test "Part 1" {
-    std.testing.log_level = .debug;
     try std.testing.expectEqual(@as(u32, 8), try solve(.one, example1));
 }
 test "Part 2" {
-    // try std.testing.expectEqual(@as(u32, 8), try solve(.two, example2));
+    try std.testing.expectEqual(@as(u32, 2286), try solve(.two, example2));
 }
 
 // Useful stdlib functions
