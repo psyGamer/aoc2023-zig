@@ -17,7 +17,8 @@ pub fn main() !void {
     const allocator = arena.allocator();
 
     std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
-    // std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+    std.log.info("Go do something else, since this will take a while lol..", .{});
+    std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {
     std.testing.log_level = .debug;
@@ -25,7 +26,7 @@ test "Part 1" {
 }
 test "Part 2" {
     std.testing.log_level = .debug;
-    // try std.testing.expectEqual(@as(u32, 8), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u32, 46), try solve(.two, example2, std.testing.allocator));
 }
 
 const Mapping = struct {
@@ -65,8 +66,22 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     var seeds = std.ArrayList(u32).init(allocator);
     defer seeds.deinit();
     var seed_iter = splitSca(u8, line_iter.next().?["seeds: ".len..], ' ');
-    while (seed_iter.next()) |seed| {
-        try seeds.append(try parseInt(u32, seed, 10));
+    if (part == .one) {
+        while (seed_iter.next()) |seed| {
+            try seeds.append(try parseInt(u32, seed, 10));
+        }
+    } else if (part == .two) {
+        while (seed_iter.next()) |start_text| {
+            const length_text = seed_iter.next().?; // They're always pairs
+
+            const start = try parseInt(u32, start_text, 10);
+            const length = try parseInt(u32, length_text, 10);
+            try seeds.ensureUnusedCapacity(length);
+
+            for (0..length) |i| {
+                seeds.appendAssumeCapacity(start + @as(u32, @intCast(i)));
+            }
+        }
     }
 
     _ = line_iter.next(); // Skip the "seed-to-soil map:"
@@ -97,7 +112,6 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
         min_location = @min(min_location, location);
     }
 
-    _ = part;
     return min_location;
 }
 
