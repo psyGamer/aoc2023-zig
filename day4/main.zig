@@ -30,12 +30,17 @@ test "Part 2" {
 
 const Card = struct { index: usize, winning: u32 };
 
-fn resolveCardsAdded(cards: []const Card, card: Card) u32 {
-    // std.log.info("{}", .{card});
-    var count: u32 = card.winning;
-    for (0..card.winning) |i| {
-        count += resolveCardsAdded(cards, cards[card.index + i + 1]);
+fn resolveCardsAdded(cards: []const Card, memo: *std.AutoHashMap(usize, u32), card: Card) !u32 {
+    if (memo.get(card.index)) |result| {
+        return result;
     }
+
+    var count: u32 = card.winning;
+    for (1..(card.winning + 1)) |i| {
+        count += try resolveCardsAdded(cards, memo, cards[card.index + i]);
+    }
+
+    try memo.put(card.index, count);
     return count;
 }
 
@@ -88,9 +93,12 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     }
 
     if (part == .two) {
+        var memo = std.AutoHashMap(usize, u32).init(allocator);
+        defer memo.deinit();
+
         var additional: u32 = 0;
         for (cards.items) |card| {
-            additional += resolveCardsAdded(cards.items, card);
+            additional += try resolveCardsAdded(cards.items, &memo, card);
         }
         return @as(u32, @intCast(cards.items.len)) + additional;
     }
