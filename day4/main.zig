@@ -25,7 +25,7 @@ test "Part 1" {
 }
 test "Part 2" {
     std.testing.log_level = .debug;
-    try std.testing.expectEqual(@as(u32, 8), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u32, 30), try solve(.two, example2, std.testing.allocator));
 }
 
 fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
@@ -42,11 +42,12 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     var having = std.ArrayList(u32).init(allocator);
     defer having.deinit();
 
-    var winning_counts = std.ArrayList(u32).init(allocator);
-    _ = winning_counts;
+    const Card = struct { index: usize, winning: u32 };
+    var cards = std.ArrayList(Card).init(allocator);
 
     var line_iter = tokenizeSca(u8, in, '\n');
-    while (line_iter.next()) |line| {
+    var idx: usize = 0;
+    while (line_iter.next()) |line| : (idx += 1) {
         // Winning
         var i: usize = start1_idx;
         // Each number is 2 digits
@@ -60,19 +61,37 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
             try having.append(try parseInt(u8, trim(u8, line[i..(i + 2)], " "), 10));
         }
 
-        var winning_count: usize = 0;
+        var winning_count: u32 = 0;
         for (having.items) |have| {
             if (contains(u32, winning.items, have)) winning_count += 1;
         }
 
-        if (winning_count > 0) {
+        if (part == .one and winning_count > 0) {
             result += try std.math.powi(u32, 2, @intCast(winning_count - 1));
+        } else if (part == .two) {
+            try cards.append(.{ .index = idx, .winning = winning_count });
         }
 
         winning.clearRetainingCapacity();
         having.clearRetainingCapacity();
     }
-    _ = part;
+
+    if (part == .two) {
+        var i: usize = 0;
+        while (i < cards.items.len) : (i += 1) {
+            const card = cards.items[i];
+            for (0..card.winning) |j| {
+                const to_clone = cards.items[card.index + j + 1];
+                // I think LLVM tries to be smart and not copy the Card.
+                // However the ArrayList reallocates and invalides that pointer.
+                // This forces there to be a copy.
+                std.mem.doNotOptimizeAway(to_clone);
+                try cards.append(to_clone);
+            }
+        }
+        return @intCast(cards.items.len);
+    }
+
     return result;
 }
 
