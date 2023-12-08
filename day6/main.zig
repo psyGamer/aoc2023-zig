@@ -20,9 +20,11 @@ pub fn main() !void {
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {
+    std.testing.log_level = .debug;
     try std.testing.expectEqual(@as(u32, 288), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
+    std.testing.log_level = .debug;
     try std.testing.expectEqual(@as(u32, 71503), try solve(.two, example2, std.testing.allocator));
 }
 
@@ -46,12 +48,30 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
 
         var result: u32 = 1;
         for (races.items) |race| {
-            var possible_times: u32 = 0;
-            for (1..race.time) |charge_time| {
-                const dist = (race.time - charge_time) * charge_time;
-                if (dist > race.dist) possible_times += 1;
+            // x = Time spent pressing; t = race.time, d = race.dist
+            // (t - x) * x   > d
+            // tx - x^2      > d
+            // tx - x^2 -  d > 0
+            // -x^2 + tx - d > 0 | a = -1 ; b = t ; c = -d
+            // The graph is always open to the bottom. That means that only if it has two 0-places, there is a section above 0.
+            // If there are only 1/0 0-places, the graph is always <= 0.
+            // We use the quadratic formula to find those two 0-places.
+            const destriminant: f32 = @floatFromInt(race.time * race.time - 4 * race.dist);
+            if (destriminant <= 0) continue;
+
+            const sqrt_desc = std.math.sqrt(destriminant);
+
+            const x1 = (-@as(f32, @floatFromInt(race.time)) + sqrt_desc) / -2.0;
+            const x2 = (-@as(f32, @floatFromInt(race.time)) - sqrt_desc) / -2.0;
+
+            // The integers between (x1;x2) are valid numbers. (NOTE: x1/x2 are not part of the set, since they are at y=0)
+            if (x1 == @ceil(x1)) {
+                // x1 is an integer and using @ceil doesn't exclude it from the set
+                result *= @intFromFloat(@ceil(x2 - x1 - 1));
+            } else {
+                // Here @ceil excludes x1 from the set
+                result *= @intFromFloat(@ceil(x2 - @ceil(x1)));
             }
-            result *= possible_times;
         }
         return result;
     } else if (part == .two) {
@@ -76,12 +96,22 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
             .dist = try parseInt(u64, dist_text, 10),
         };
 
-        var possible_times: u32 = 0;
-        for (1..race.time) |charge_time| {
-            const dist = (race.time - charge_time) * charge_time;
-            if (dist > race.dist) possible_times += 1;
+        // See above for explaination
+        const destriminant: f64 = @floatFromInt(race.time * race.time - 4 * race.dist);
+        if (destriminant <= 0) unreachable; // This doesn't make sense for this puzzle
+
+        const sqrt_desc = std.math.sqrt(destriminant);
+
+        const x1 = (-@as(f64, @floatFromInt(race.time)) + sqrt_desc) / -2.0;
+        const x2 = (-@as(f64, @floatFromInt(race.time)) - sqrt_desc) / -2.0;
+
+        if (x1 == @ceil(x1)) {
+            // x1 is an integer and using @ceil doesn't exclude it from the set
+            return @intFromFloat(@ceil(x2 - x1 - 1));
+        } else {
+            // Here @ceil excludes x1 from the set
+            return @intFromFloat(@ceil(x2 - @ceil(x1)));
         }
-        return possible_times;
     }
 
     unreachable;
