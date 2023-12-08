@@ -21,11 +21,11 @@ pub fn main() !void {
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {
-    try std.testing.expectEqual(@as(u32, 2), try solve(.one, example1, std.testing.allocator));
-    try std.testing.expectEqual(@as(u32, 6), try solve(.one, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 2), try solve(.one, example1, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 6), try solve(.one, example2, std.testing.allocator));
 }
 test "Part 2" {
-    try std.testing.expectEqual(@as(u32, 6), try solve(.two, example3, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 6), try solve(.two, example3, std.testing.allocator));
 }
 
 fn toNodeID(in: []const u8) NodeID {
@@ -44,7 +44,7 @@ const Node = struct {
     right: NodeID,
 };
 
-fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
+fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
     var line_iter = tokenizeSca(u8, in, '\n');
 
     const route = line_iter.next().?;
@@ -92,7 +92,12 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
         var steps: u32 = 0;
         var i: usize = 0;
 
-        while (true) : ({
+        var loop_offsets = try allocator.alloc(?usize, current_ids.len);
+        defer allocator.free(loop_offsets);
+        @memset(loop_offsets, null);
+        var remaining_offsets = current_ids.len;
+
+        outer: while (true) : ({
             i = (i + 1) % route.len;
             steps += 1;
         }) {
@@ -100,6 +105,10 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
             for (current_ids, 0..) |id, j| {
                 if (id & 0xFF != 'Z') {
                     done = false;
+                } else {
+                    if (loop_offsets[j] == null) loop_offsets[j] = steps;
+                    remaining_offsets -= 1;
+                    if (remaining_offsets == 0) break :outer;
                 }
 
                 if (route[i] == 'L') {
@@ -111,7 +120,15 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
             if (done) break;
         }
 
-        return steps;
+        const lcm_input = try allocator.alloc(u64, loop_offsets.len);
+        defer allocator.free(lcm_input);
+        for (loop_offsets, lcm_input) |off, *lcm_in| {
+            lcm_in.* = @intCast(off.?);
+        }
+
+        // All ghost have looped at least once
+        // The least-common-multiple is the result
+        return lcm(lcm_input);
     }
     unreachable;
 }
@@ -142,3 +159,13 @@ const assert = std.debug.assert;
 const sort = std.sort.block;
 const asc = std.sort.asc;
 const desc = std.sort.desc;
+
+fn lcm_single(a: u64, b: u64) u64 {
+    return a * b / std.math.gcd(a, b);
+}
+fn lcm(numbers: []const u64) u64 {
+    return if (numbers.len > 2)
+        lcm_single(numbers[0], lcm(numbers[1..]))
+    else
+        lcm_single(numbers[0], numbers[1]);
+}
