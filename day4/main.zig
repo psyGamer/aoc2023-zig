@@ -28,6 +28,17 @@ test "Part 2" {
     try std.testing.expectEqual(@as(u32, 30), try solve(.two, example2, std.testing.allocator));
 }
 
+const Card = struct { index: usize, winning: u32 };
+
+fn resolveCardsAdded(cards: []const Card, card: Card) u32 {
+    // std.log.info("{}", .{card});
+    var count: u32 = card.winning;
+    for (0..card.winning) |i| {
+        count += resolveCardsAdded(cards, cards[card.index + i + 1]);
+    }
+    return count;
+}
+
 fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     var result: u32 = 0;
 
@@ -42,8 +53,8 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     var having = std.ArrayList(u32).init(allocator);
     defer having.deinit();
 
-    const Card = struct { index: usize, winning: u32 };
     var cards = std.ArrayList(Card).init(allocator);
+    defer cards.deinit();
 
     var line_iter = tokenizeSca(u8, in, '\n');
     var idx: usize = 0;
@@ -77,19 +88,11 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     }
 
     if (part == .two) {
-        var i: usize = 0;
-        while (i < cards.items.len) : (i += 1) {
-            const card = cards.items[i];
-            for (0..card.winning) |j| {
-                const to_clone = cards.items[card.index + j + 1];
-                // I think LLVM tries to be smart and not copy the Card.
-                // However the ArrayList reallocates and invalides that pointer.
-                // This forces there to be a copy.
-                std.mem.doNotOptimizeAway(to_clone);
-                try cards.append(to_clone);
-            }
+        var additional: u32 = 0;
+        for (cards.items) |card| {
+            additional += resolveCardsAdded(cards.items, card);
         }
-        return @intCast(cards.items.len);
+        return @as(u32, @intCast(cards.items.len)) + additional;
     }
 
     return result;
