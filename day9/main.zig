@@ -25,12 +25,10 @@ test "Part 1" {
 }
 test "Part 2" {
     std.testing.log_level = .debug;
-    try std.testing.expectEqual(@as(u64, 6), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 2), try solve(.two, example2, std.testing.allocator));
 }
 
 fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
-    _ = part;
-
     var line_iter = tokenizeSca(u8, in, '\n');
 
     var sequences = std.ArrayList(std.ArrayList(i32)).init(allocator);
@@ -61,15 +59,27 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
             try sequences.append(std.ArrayList(i32).init(allocator));
         }
         i += 1;
-        // Append zero
-        try sequences.items[i].append(0);
-        // Propegate up
-        while (i > 0) : (i -= 1) {
-            const last = sequences.items[i].items.len;
-            const new = sequences.items[i - 1].items[last - 1] + sequences.items[i].items[last - 1];
-            try sequences.items[i - 1].append(new);
+
+        if (part == .one) {
+            // Append zero
+            try sequences.items[i].append(0);
+            // Propegate up
+            while (i > 0) : (i -= 1) {
+                const last = sequences.items[i].items.len;
+                const new = sequences.items[i - 1].items[last - 1] + sequences.items[i].items[last - 1];
+                try sequences.items[i - 1].append(new);
+            }
+            result += sequences.items[0].items[sequences.items[0].items.len - 1];
+        } else if (part == .two) {
+            // Prepend zero
+            try sequences.items[i].insert(0, 0);
+            // Propegate up
+            while (i > 0) : (i -= 1) {
+                const new = -sequences.items[i].items[0] + sequences.items[i - 1].items[0];
+                try sequences.items[i - 1].insert(0, new);
+            }
+            result += sequences.items[0].items[0];
         }
-        result += sequences.items[0].items[sequences.items[0].items.len - 1];
 
         for (sequences.items) |*seq| {
             seq.clearRetainingCapacity();
