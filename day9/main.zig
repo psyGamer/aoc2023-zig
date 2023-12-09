@@ -28,66 +28,42 @@ test "Part 2" {
     try std.testing.expectEqual(@as(u64, 2), try solve(.two, example2, std.testing.allocator));
 }
 
-fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
+fn lagrange_interpolation(values: []const i32, x: i32) f64 {
+    var result: f64 = 0;
+
+    var i: i32 = 0;
+    while (i < values.len) : (i += 1) {
+        var term: f64 = @floatFromInt(values[@intCast(i)]);
+        var j: i32 = 0;
+        while (j < values.len) : (j += 1) {
+            if (i == j) continue;
+            term = term * @as(f64, @floatFromInt(x - j)) / @as(f64, @floatFromInt(i - j));
+        }
+        result += term;
+    }
+    return result;
+}
+
+fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     var line_iter = tokenizeSca(u8, in, '\n');
 
-    var sequences = std.ArrayList(std.ArrayList(i32)).init(allocator);
-    defer sequences.deinit();
-
-    try sequences.resize(2); // Required for inital list and first subset
-    @memset(sequences.items, std.ArrayList(i32).init(allocator));
-
+    var sequence = std.ArrayList(i32).init(allocator);
+    defer sequence.deinit();
     var result: i32 = 0;
 
     while (line_iter.next()) |line| {
         var seq_iter = splitSca(u8, line, ' ');
         while (seq_iter.next()) |seq| {
-            try sequences.items[0].append(try parseInt(i32, seq, 10));
+            try sequence.append(try parseInt(i32, seq, 10));
         }
-
-        // Propegate down
-        var i: usize = 0;
-        while (true) : (i += 1) {
-            var all_zero = true;
-            for (0..(sequences.items[i].items.len - 1)) |j| {
-                const value = (sequences.items[i].items[j + 1] - sequences.items[i].items[j]);
-                // If ever value is 0 except the first one, there won't be any differences when further propagating down
-                if (value != 0) all_zero = false;
-                try sequences.items[i + 1].append(@intCast(value));
-            }
-            if (all_zero) break;
-            try sequences.append(std.ArrayList(i32).init(allocator));
-        }
-        i += 1;
 
         if (part == .one) {
-            // Append zero
-            try sequences.items[i].append(0);
-            // Propegate up
-            while (i > 0) : (i -= 1) {
-                const last = sequences.items[i].items.len;
-                const new = sequences.items[i - 1].items[last - 1] + sequences.items[i].items[last - 1];
-                try sequences.items[i - 1].append(new);
-            }
-            result += sequences.items[0].items[sequences.items[0].items.len - 1];
+            result += @intFromFloat(@round(lagrange_interpolation(sequence.items, @intCast(sequence.items.len))));
         } else if (part == .two) {
-            // Prepend zero
-            try sequences.items[i].insert(0, 0);
-            // Propegate up
-            while (i > 0) : (i -= 1) {
-                const new = -sequences.items[i].items[0] + sequences.items[i - 1].items[0];
-                try sequences.items[i - 1].insert(0, new);
-            }
-            result += sequences.items[0].items[0];
+            result += @intFromFloat(@round(lagrange_interpolation(sequence.items, -1)));
         }
 
-        for (sequences.items) |*seq| {
-            seq.clearRetainingCapacity();
-        }
-    }
-
-    for (sequences.items) |*seq| {
-        seq.deinit();
+        sequence.clearRetainingCapacity();
     }
 
     return @intCast(result);
