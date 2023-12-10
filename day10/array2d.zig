@@ -6,6 +6,8 @@ pub fn Array2D(comptime T: type) type {
     return struct {
         const Self = @This();
 
+        // Monocle subdivides this 2D array, kind like a quad tree.
+        // We don't do this since this is simpler and more performant, be it at a higher memory usage.
         data: []T,
         width: usize,
         height: usize,
