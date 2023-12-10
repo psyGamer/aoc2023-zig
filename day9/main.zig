@@ -21,11 +21,11 @@ pub fn main() !void {
 }
 test "Part 1" {
     std.testing.log_level = .debug;
-    try std.testing.expectEqual(@as(u64, 114), try solve(.one, example1, std.testing.allocator));
+    try std.testing.expectEqual(@as(i32, 114), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
     std.testing.log_level = .debug;
-    try std.testing.expectEqual(@as(u64, 2), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(i32, 2), try solve(.two, example2, std.testing.allocator));
 }
 
 fn lagrange_interpolation(values: []const i32, x: i32) f64 {
@@ -41,16 +41,17 @@ fn lagrange_interpolation(values: []const i32, x: i32) f64 {
         }
         result += term;
     }
+
     return result;
 }
 
-fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    var line_iter = tokenizeSca(u8, in, '\n');
+fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !i32 {
+    var result: i32 = 0;
 
     var sequence = std.ArrayList(i32).init(allocator);
     defer sequence.deinit();
-    var result: i32 = 0;
 
+    var line_iter = tokenizeSca(u8, in, '\n');
     while (line_iter.next()) |line| {
         var seq_iter = splitSca(u8, line, ' ');
         while (seq_iter.next()) |seq| {
@@ -66,7 +67,7 @@ fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         sequence.clearRetainingCapacity();
     }
 
-    return @intCast(result);
+    return result;
 }
 
 // Useful stdlib functions

@@ -202,9 +202,8 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
         return d - 1;
     }
 
-    // Generate a map of crossing-numbers
-    // The raycast is diagonal, to avoid
-
+    // Part 2
+    // Perform a raycast, to determine if a point is inside/outside
     var edge_counts = try Array2D(u32).initWithDefault(allocator, map.width, map.height, 420);
     defer edge_counts.deinit(allocator);
 
@@ -213,7 +212,6 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
         var last_edge: PipeTile = .none;
         for (0..map.width) |x| {
             const tile = map.get(x, y);
-            std.log.warn("{} {} {}", .{ tile, x, y });
             if (tile == .none or visited.get(x, y) == false) {
                 edge_counts.set(x, y, edges);
                 continue;
@@ -236,108 +234,17 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
                     last_edge = tile;
                 },
             }
-            std.log.warn("{} {}", .{ tile, last_edge });
         }
     }
-
-    std.log.err("hi", .{});
-    std.debug.print("{}", .{edge_counts});
-    std.debug.print("{}", .{map});
-    std.debug.print("{}", .{visited});
-
-    // var edge_counts = try Array2D(u32).initWithDefault(allocator, map.width, map.height, 420);
-    // outer: for (0..map.width) |x| {
-    //     var i: usize = 0;
-    //     var edges: u32 = 0;
-    //     for (0..map.height) |y| {
-    //         if (x + i >= map.width) continue :outer;
-    //         const tile = map.get(x + i, y);
-    //         if (tile != .none) {
-    //             edges += 1;
-    //             edge_counts.set(x + i, y, 69);
-    //         } else {
-    //             edge_counts.set(x + i, y, edges);
-    //         }
-    //         i += 1;
-    //     }
-    // }
-
-    // std.log.err("{}", .{edge_counts});
-
-    // var l_pass = try Array2D(u32).initWithDefault(allocator, map.width, map.height, 0);
-    // defer l_pass.deinit(allocator);
-    // var r_pass = try Array2D(u32).initWithDefault(allocator, map.width, map.height, 0);
-    // defer r_pass.deinit(allocator);
-
-    // for (0..map.height) |y| {
-    //     var l_edges: u32 = 0;
-    //     var r_edges: u32 = 0;
-    //     for (0..map.width) |x| {
-    //         const tile = map.get(x, y);
-    //         if (tile != .none) {
-    //             l_edges += 1;
-    //         } else {
-    //             l_pass.set(x, y, l_edges);
-    //         }
-    //     }
-    //     var x: usize = map.width - 1;
-    //     while (x >= 0) {
-    //         const tile = map.get(x, y);
-    //         if (tile != .none) {
-    //             r_edges += 1;
-    //         } else {
-    //             r_pass.set(x, y, r_edges);
-    //         }
-
-    //         if (x == 0) break;
-    //         x -= 1;
-    //     }
-    // }
-
-    // var t_pass = try Array2D(u32).initWithDefault(allocator, map.width, map.height, 0);
-    // defer t_pass.deinit(allocator);
-    // var b_pass = try Array2D(u32).initWithDefault(allocator, map.width, map.height, 0);
-    // defer b_pass.deinit(allocator);
-
-    // for (0..map.width) |x| {
-    //     var t_edges: u32 = 0;
-    //     var b_edges: u32 = 0;
-    //     for (0..map.height) |y| {
-    //         const tile = map.get(x, y);
-    //         if (tile != .none) {
-    //             t_edges += 1;
-    //         } else {
-    //             t_pass.set(x, y, t_edges);
-    //         }
-    //     }
-    //     var y: usize = map.height - 1;
-    //     while (y >= 0) {
-    //         const tile = map.get(x, y);
-    //         if (tile != .none) {
-    //             b_edges += 1;
-    //         } else {
-    //             b_pass.set(x, y, b_edges);
-    //         }
-
-    //         if (y == 0) break;
-    //         y -= 1;
-    //     }
-    // }
-
-    // std.log.err("Hi", .{});
-    // std.debug.print("{}\n", .{l_pass});
-    // std.debug.print("{}\n", .{r_pass});
-    // std.debug.print("{}\n", .{b_pass});
-    // std.debug.print("{}\n", .{t_pass});
 
     var inside: u32 = 0;
     for (0..map.height) |y| {
         for (0..map.width) |x| {
-            if ((map.get(x, y) == .none or visited.get(x, y) == false) and edge_counts.get(x, y) % 2 == 1) inside += 1;
+            if ((map.get(x, y) == .none or visited.get(x, y) == false) and edge_counts.get(x, y) % 2 == 1)
+                inside += 1;
         }
     }
 
-    std.log.warn("{}", .{inside});
     return inside;
 }
 
