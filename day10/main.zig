@@ -15,6 +15,10 @@ const example5 = @embedFile("example5.txt");
 const Array2D = @import("array2d.zig").Array2D;
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -107,7 +111,7 @@ fn advancePosition(map: Array2D(PipeTile), position: *Vec2u, prev_dir: *Directio
 fn getAtPos(x: usize, y: usize, width: usize, buf: []const u8) u8 {
     return buf[y * width + x];
 }
-fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
+fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').? + 1;
     const height = in.len / width;
 

@@ -11,6 +11,10 @@ const example2 = @embedFile("example2.txt");
 
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -30,7 +34,7 @@ test "Part 2" {
 
 const Race = struct { time: u64, dist: u64 };
 
-fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
+fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
     var line_iter = splitSca(u8, in, '\n');
 
     var time_iter = tokenizeSca(u8, line_iter.next().?["Time:     ".len..], ' ');

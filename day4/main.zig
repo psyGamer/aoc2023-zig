@@ -11,6 +11,10 @@ const example2 = @embedFile("example2.txt");
 
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();

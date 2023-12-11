@@ -11,14 +11,19 @@ const example2 = @embedFile("example2.txt");
 
 const Part = enum { one, two };
 
-pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-    _ = allocator;
+pub const std_options = struct {
+    pub const log_level = .info;
+};
 
+pub fn main() !void {
     std.log.info("Result (Part 1): {}", .{try solve(.one, input)});
     std.log.info("Result (Part 2): {}", .{try solve(.two, input)});
+}
+test "Part 1" {
+    try std.testing.expectEqual(@as(u32, 8), try solve(.one, example1));
+}
+test "Part 2" {
+    try std.testing.expectEqual(@as(u32, 2286), try solve(.two, example2));
 }
 
 const Entry = struct {
@@ -50,7 +55,7 @@ const Entry = struct {
     }
 };
 
-fn solve(part: Part, in: []const u8) !u32 {
+fn solve(comptime part: Part, in: []const u8) !u32 {
     var result: u32 = 0;
 
     var i: u32 = 1;
@@ -91,13 +96,6 @@ fn solve(part: Part, in: []const u8) !u32 {
     }
 
     return result;
-}
-
-test "Part 1" {
-    try std.testing.expectEqual(@as(u32, 8), try solve(.one, example1));
-}
-test "Part 2" {
-    try std.testing.expectEqual(@as(u32, 2286), try solve(.two, example2));
 }
 
 // Useful stdlib functions

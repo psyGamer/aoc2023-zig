@@ -11,6 +11,10 @@ const example2 = @embedFile("example2.txt");
 
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -89,7 +93,7 @@ const HandType = enum {
     four_of_a_kind,
     five_of_a_kind,
 
-    pub fn parse(in: []const u8, part: Part) HandType {
+    pub fn parse(in: []const u8, comptime part: Part) HandType {
         var cards = [_]Card{undefined} ** 5;
         var counts = [_]u32{0} ** 5;
         var idx: usize = 0;
@@ -167,7 +171,7 @@ const Hand = struct {
     bid: u32,
     part: Part,
 
-    pub fn parse(in: []const u8, bid: u32, part: Part) Hand {
+    pub fn parse(in: []const u8, bid: u32, comptime part: Part) Hand {
         return .{
             .type = HandType.parse(in, part),
             .cards = .{
@@ -191,7 +195,7 @@ const Hand = struct {
     }
 };
 
-fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
+fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
     var hands = std.ArrayList(Hand).init(allocator);
     defer hands.deinit();
 

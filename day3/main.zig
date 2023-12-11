@@ -12,6 +12,10 @@ const example2 = @embedFile("example2.txt");
 const Array2D = @import("array2d.zig").Array2D;
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -19,6 +23,12 @@ pub fn main() !void {
 
     std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+}
+test "Part 1" {
+    try std.testing.expectEqual(@as(u32, 4361), try solve(.one, example1, std.testing.allocator));
+}
+test "Part 2" {
+    try std.testing.expectEqual(@as(u32, 8), try solve(.two, example2, std.testing.allocator));
 }
 
 fn getAtPos(x: usize, y: usize, width: usize, buf: []const u8) u8 {
@@ -53,7 +63,7 @@ fn useMapValue(map: Array2D(i32), x: usize, y: usize) u32 {
     return @max(0, value);
 }
 
-fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
+fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
     var result: u32 = 0;
     const width = indexOf(u8, in, '\n').? + 1;
     const height = in.len / width;
@@ -146,13 +156,6 @@ fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     }
 
     return result;
-}
-
-test "Part 1" {
-    try std.testing.expectEqual(@as(u32, 4361), try solve(.one, example1, std.testing.allocator));
-}
-test "Part 2" {
-    try std.testing.expectEqual(@as(u32, 8), try solve(.two, example2, std.testing.allocator));
 }
 
 // Useful stdlib functions

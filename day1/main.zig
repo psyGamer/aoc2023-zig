@@ -11,11 +11,14 @@ const example2 = @embedFile("example2.txt");
 
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     std.log.info("Result (Part 1): {}", .{solve(.one, input)});
     std.log.info("Result (Part 2): {}", .{solve(.two, input)});
 }
-
 test "Part 1" {
     try std.testing.expectEqual(@as(u32, 142), solve(.one, example1));
 }
@@ -23,7 +26,7 @@ test "Part 2" {
     try std.testing.expectEqual(@as(u32, 281), solve(.two, example2));
 }
 
-fn solve(part: Part, in: []const u8) u32 {
+fn solve(comptime part: Part, in: []const u8) u32 {
     var result: u32 = 0;
     var iter = tokenizeSca(u8, in, '\n');
     while (iter.next()) |line| {

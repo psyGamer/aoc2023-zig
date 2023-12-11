@@ -12,6 +12,10 @@ const example3 = @embedFile("example3.txt");
 
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -33,18 +37,13 @@ fn toNodeID(in: []const u8) NodeID {
     // return .{ .one = in[0], .two = in[1], .three = in[2] };
 }
 
-// const NodeID = packed struct(u24) {
-//     one: u8,
-//     two: u8,
-//     three: u8,
-// };
 const NodeID = u24;
 const Node = struct {
     left: NodeID,
     right: NodeID,
 };
 
-fn solve(part: Part, in: []const u8, allocator: Allocator) !u64 {
+fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     var line_iter = tokenizeSca(u8, in, '\n');
 
     const route = line_iter.next().?;
