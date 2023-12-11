@@ -57,28 +57,20 @@ fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         }
     }
 
-    var pairs = std.AutoArrayHashMap(Vec2ux2, void).init(allocator);
-    defer pairs.deinit();
-
-    for (galaxies.items, 0..) |a, i| {
-        for (galaxies.items, 0..) |b, j| {
-            if (i == j) continue;
-            try pairs.put(.{ .a = if (i < j) a else b, .b = if (i < j) b else a }, {});
-        }
-    }
-
     var sum: usize = 0;
 
-    for (pairs.keys()) |pair| {
-        const start_x = if (pair.a.x > pair.b.x) pair.b.x else pair.a.x;
-        const end_x = if (pair.a.x > pair.b.x) pair.a.x else pair.b.x;
-        const start_y = if (pair.a.y > pair.b.y) pair.b.y else pair.a.y;
-        const end_y = if (pair.a.y > pair.b.y) pair.a.y else pair.b.y;
-        const x_expansion = std.mem.count(bool, col_with_galaxy[start_x..end_x], &.{false}) * (@as(usize, (if (part == .two) 1000000 else 2) - 1));
-        const y_expansion = std.mem.count(bool, row_with_galaxy[start_y..end_y], &.{false}) * (@as(usize, (if (part == .two) 1000000 else 2) - 1));
+    for (galaxies.items, 0..) |a, i| {
+        for (galaxies.items[i..]) |b| {
+            const start_x = if (a.x > b.x) b.x else a.x;
+            const end_x = if (a.x > b.x) a.x else b.x;
+            const start_y = if (a.y > b.y) b.y else a.y;
+            const end_y = if (a.y > b.y) a.y else b.y;
+            const x_expansion = std.mem.count(bool, col_with_galaxy[start_x..end_x], &.{false}) * (@as(usize, (if (part == .two) 1000000 else 2) - 1));
+            const y_expansion = std.mem.count(bool, row_with_galaxy[start_y..end_y], &.{false}) * (@as(usize, (if (part == .two) 1000000 else 2) - 1));
 
-        sum += @abs(@as(i64, @intCast(pair.a.x)) - @as(i64, @intCast(pair.b.x))) + @as(u64, @intCast(x_expansion -| 0));
-        sum += @abs(@as(i64, @intCast(pair.a.y)) - @as(i64, @intCast(pair.b.y))) + @as(u64, @intCast(y_expansion -| 0));
+            sum += @abs(@as(i64, @intCast(a.x)) - @as(i64, @intCast(b.x))) + @as(u64, @intCast(x_expansion -| 0));
+            sum += @abs(@as(i64, @intCast(a.y)) - @as(i64, @intCast(b.y))) + @as(u64, @intCast(y_expansion -| 0));
+        }
     }
 
     return sum;
