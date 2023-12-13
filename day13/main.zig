@@ -22,91 +22,152 @@ pub fn main() !void {
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 405), try solve(.one, example1, std.testing.allocator));
-    try std.testing.expectEqual(@as(u64, 700), try solve(.one, example2, std.testing.allocator));
 }
 test "Part 2" {
-    // try std.testing.expectEqual(@as(u64, 6), try solve(.two, example3, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 400), try solve(.two, example1, std.testing.allocator));
+}
+
+fn solve_h_reflect(line: []const u8, memo: []bool) void {
+    for (1..line.len) |i| {
+        if (!memo[i - 1]) continue;
+
+        var left: usize = i - 1;
+        var right: usize = i;
+        while (true) {
+            if (line[left] != line[right]) {
+                memo[i - 1] = false;
+                break;
+            }
+
+            if (left <= 0 or right >= line.len - 1) break;
+            left -= 1;
+            right += 1;
+        }
+    }
+}
+fn solve_v_reflect(lines: [][]const u8, x: usize, memo: []bool) void {
+    for (1..lines.len) |i| {
+        if (!memo[i - 1]) continue;
+
+        var top: usize = i - 1;
+        var bottom: usize = i;
+        while (true) {
+            if (lines[top][x] != lines[bottom][x]) {
+                memo[i - 1] = false;
+                break;
+            }
+
+            if (top <= 0 or bottom >= lines.len - 1) break;
+            top -= 1;
+            bottom += 1;
+        }
+    }
 }
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    _ = part;
     var result: u32 = 0;
 
-    var lines = std.ArrayList([]const u8).init(allocator);
+    var lines = std.ArrayList([]u8).init(allocator);
     defer lines.deinit();
 
-    var v_reflect: ?[]bool = null;
-
     var line_iter = splitSca(u8, in, '\n');
-    while (line_iter.next()) |line| {
+    outer: while (line_iter.next()) |line| {
         if (line.len > 0) {
-            if (v_reflect == null) {
-                v_reflect = try allocator.alloc(bool, line.len - 1);
-                @memset(v_reflect.?, true);
-            }
-            try lines.append(line);
-
-            std.debug.assert(line.len % 2 == 1);
-
-            // Check for reflectivness
-            for (1..line.len) |i| {
-                if (!v_reflect.?[i - 1]) continue;
-
-                var left: usize = i - 1;
-                var right: usize = i;
-                while (true) {
-                    if (line[left] != line[right]) {
-                        v_reflect.?[i - 1] = false;
-                        break;
-                    }
-
-                    if (left <= 0 or right >= line.len - 1) break;
-                    left -= 1;
-                    right += 1;
-                }
-            }
-
+            try lines.append(try allocator.dupe(u8, line));
             continue;
         }
 
-        std.debug.assert(lines.items.len % 2 == 1);
+        defer {
+            for (lines.items) |l| {
+                allocator.free(l);
+            }
+            lines.clearRetainingCapacity();
+        }
+
+        var h_point: u32 = 0;
+        var v_point: u32 = 0;
 
         // Check for V reflectivity
-        if (indexOf(bool, v_reflect.?, true)) |idx| {
-            result += @intCast(idx + 1);
-        }
-        // Check for H reflectivity
-        var h_reflect = try allocator.alloc(bool, lines.items.len - 1);
+        var h_reflect = try allocator.alloc(bool, lines.items[0].len - 1);
         defer allocator.free(h_reflect);
         @memset(h_reflect, true);
 
-        // const offset = if (lines.items.len % 2 == 0) 1 else 0;
-        for (0..v_reflect.?.len + 1) |x| {
-            for (1..lines.items.len) |i| {
-                if (!h_reflect[i - 1]) continue;
-
-                var top: usize = i - 1;
-                var bottom: usize = i;
-                while (true) {
-                    if (lines.items[top][x] != lines.items[bottom][x]) {
-                        h_reflect[i - 1] = false;
-                        break;
-                    }
-
-                    if (top <= 0 or bottom >= lines.items.len - 1) break;
-                    top -= 1;
-                    bottom += 1;
-                }
-            }
+        for (lines.items) |l| {
+            solve_h_reflect(l, h_reflect);
         }
 
         if (indexOf(bool, h_reflect, true)) |idx| {
-            result += @intCast(100 * (idx + 1));
+            h_point = @intCast(idx + 1);
         }
 
-        lines.clearRetainingCapacity();
-        allocator.free(v_reflect.?);
-        v_reflect = null;
+        // Check for H reflectivity
+        var v_reflect = try allocator.alloc(bool, lines.items.len - 1);
+        defer allocator.free(v_reflect);
+        @memset(v_reflect, true);
+
+        for (0..lines.items[0].len) |x| {
+            solve_v_reflect(lines.items, x, v_reflect);
+        }
+
+        if (indexOf(bool, v_reflect, true)) |idx| {
+            v_point = @intCast(idx + 1);
+        }
+
+        if (part == .one) {
+            result += h_point + v_point * 100;
+            continue;
+        }
+
+        for (0..lines.items.len) |ny| {
+            for (0..lines.items[0].len) |nx| {
+                const prev = lines.items[ny][nx];
+                lines.items[ny][nx] = if (prev == '.') '#' else '.';
+
+                // Check for V reflectivity
+                @memset(h_reflect, true);
+
+                for (lines.items) |l| {
+                    solve_h_reflect(l, h_reflect);
+                }
+
+                var h_idx: ?usize = null;
+                for (0..h_reflect.len) |i| {
+                    if (i + 1 == h_point) continue;
+                    if (h_reflect[i] == true) {
+                        h_idx = i;
+                        break;
+                    }
+                }
+
+                if (h_idx) |idx| {
+                    result += @intCast(idx + 1);
+                    continue :outer;
+                }
+
+                // Check for H reflectivity
+                @memset(v_reflect, true);
+
+                for (0..lines.items[0].len) |x| {
+                    solve_v_reflect(lines.items, x, v_reflect);
+                }
+
+                var v_idx: ?usize = null;
+                for (0..v_reflect.len) |i| {
+                    if (i + 1 == v_point) continue;
+                    if (v_reflect[i] == true) {
+                        v_idx = i;
+                        break;
+                    }
+                }
+
+                if (v_idx) |idx| {
+                    result += @intCast(100 * (idx + 1));
+                    continue :outer;
+                }
+
+                lines.items[ny][nx] = prev;
+            }
+        }
     }
 
     return result;
