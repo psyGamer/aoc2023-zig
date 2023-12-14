@@ -12,25 +12,113 @@ const example2 = @embedFile("example2.txt");
 const Array2D = @import("array2d.zig").Array2D;
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
+    // std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 136), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
-    // try std.testing.expectEqual(@as(u64, 6), try solve(.two, example3, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 64), try solve(.two, example1, std.testing.allocator));
 }
 
 const State = enum(u8) { none = '.', cube = '#', round = 'O' };
 
+fn shift_north(map: *Array2D(State)) void {
+    for (1..map.height) |y| {
+        for (0..map.width) |x| {
+            if (map.get(x, y) != .round) continue;
+
+            var ny = y;
+            while (true) {
+                ny -= 1;
+                if (map.get(x, ny) != .none) {
+                    ny += 1;
+                    break;
+                }
+                if (ny == 0) break;
+            }
+
+            map.set(x, y, .none);
+            map.set(x, ny, .round);
+        }
+    }
+}
+fn shift_south(map: *Array2D(State)) void {
+    var y: usize = map.height - 1;
+    while (y > 0) {
+        y -= 1;
+        for (0..map.width) |x| {
+            if (map.get(x, y) != .round) continue;
+
+            var ny: usize = y + 1;
+            while (true) {
+                if (map.get(x, ny) != .none) {
+                    ny -= 1;
+                    break;
+                }
+                if (ny == map.height - 1) break;
+                ny += 1;
+            }
+
+            map.set(x, y, .none);
+            map.set(x, ny, .round);
+        }
+    }
+}
+fn shift_west(map: *Array2D(State)) void {
+    for (0..map.height) |y| {
+        for (1..map.width) |x| {
+            if (map.get(x, y) != .round) continue;
+
+            var nx: usize = x;
+            while (true) {
+                nx -= 1;
+                if (map.get(nx, y) != .none) {
+                    nx += 1;
+                    break;
+                }
+                if (nx == 0) break;
+            }
+
+            map.set(x, y, .none);
+            map.set(nx, y, .round);
+        }
+    }
+}
+fn shift_east(map: *Array2D(State)) void {
+    for (0..map.height) |y| {
+        var x: usize = map.width - 1;
+        while (x > 0) {
+            x -= 1;
+            if (map.get(x, y) != .round) continue;
+
+            var nx: usize = x + 1;
+            while (true) {
+                if (map.get(nx, y) != .none) {
+                    nx -= 1;
+                    break;
+                }
+                if (nx == map.width - 1) break;
+                nx += 1;
+            }
+
+            map.set(x, y, .none);
+            map.set(nx, y, .round);
+        }
+    }
+}
+
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    _ = part;
     const width = indexOf(u8, in, '\n').?;
     const height = in.len / width - 1;
 
@@ -47,23 +135,38 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         }
     }
 
-    // Move all round rocks north until they hit a cube or OOB
-    for (1..height) |y| {
-        for (0..width) |x| {
-            if (map.get(x, y) != .round) continue;
+    if (part == .one) {
+        shift_north(&map);
+    } else if (part == .two) {
+        var memo = std.AutoHashMap(u64, usize).init(allocator);
+        var loop_size: usize = undefined;
 
-            var ny = y;
-            while (true) {
-                ny -= 1;
-                if (map.get(x, ny) != .none) {
-                    ny += 1;
-                    break;
-                }
-                if (ny == 0) break;
+        var i: usize = 0;
+        while (true) : (i += 1) {
+            const hash = std.hash.Wyhash.hash(0, @ptrCast(map.data));
+
+            if (memo.get(hash)) |loop_start| {
+                // Loop detected
+                loop_size = i - loop_start;
+                break;
             }
 
-            map.set(x, y, .none);
-            map.set(x, ny, .round);
+            shift_north(&map);
+            shift_west(&map);
+            shift_south(&map);
+            shift_east(&map);
+
+            try memo.put(hash, i);
+        }
+
+        const repeat_count = 1000000000;
+        const remaining = (repeat_count - i) % loop_size;
+
+        for (0..remaining) |_| {
+            shift_north(&map);
+            shift_west(&map);
+            shift_south(&map);
+            shift_east(&map);
         }
     }
 

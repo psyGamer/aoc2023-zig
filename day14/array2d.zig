@@ -46,7 +46,7 @@ pub fn Array2D(comptime T: type) type {
             _ = options;
             for (0..value.height) |y| {
                 for (0..value.width) |x| {
-                    try writer.print("{" ++ fmt ++ "} ", .{value.get(x, y)});
+                    try writer.print("{" ++ fmt ++ "}", .{@intFromEnum(value.get(x, y))});
                 }
                 try writer.writeByte('\n');
             }
