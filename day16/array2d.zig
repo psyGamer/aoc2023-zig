@@ -41,12 +41,19 @@ pub fn Array2D(comptime T: type) type {
             std.debug.assert(y < self.height);
             return self.data[y * self.width + x];
         }
+        pub inline fn getPtr(self: Self, x: usize, y: usize) *T {
+            std.debug.assert(x >= 0);
+            std.debug.assert(y >= 0);
+            std.debug.assert(x < self.width);
+            std.debug.assert(y < self.height);
+            return &self.data[y * self.width + x];
+        }
 
         pub fn format(value: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
             _ = options;
             for (0..value.height) |y| {
                 for (0..value.width) |x| {
-                    try writer.print("{" ++ fmt ++ "}", .{@as(u8, if (value.get(x, y)) '#' else '.')});
+                    try writer.print("{" ++ fmt ++ "}", .{value.get(x, y).mask});
                 }
                 try writer.writeByte('\n');
             }

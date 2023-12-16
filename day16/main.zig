@@ -31,7 +31,9 @@ test "Part 2" {
     try std.testing.expectEqual(@as(u64, 51), try solve(.two, example1, std.testing.allocator));
 }
 
-const Dir = enum(u2) { l, u, r, d };
+const Dir = enum(u2) { l, r, u, d };
+const Visited = std.bit_set.IntegerBitSet(4);
+
 const State = packed struct(u16) {
     x: u7,
     y: u7,
@@ -51,47 +53,39 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').?;
     const height = in.len / (width + 1);
 
-    var energized = try Array2D(bool).initWithDefault(allocator, width, height, false);
-    defer energized.deinit(allocator);
-
-    const S = struct {
-        var visited = [_]bool{false} ** std.math.maxInt(u16);
-    };
+    var visited = try Array2D(Visited).initWithDefault(allocator, width, height, Visited.initEmpty());
+    defer visited.deinit(allocator);
 
     if (part == .one) {
-        try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
-        return std.mem.count(bool, energized.data, &.{true});
+        try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &visited, in, @intCast(width + 1), @intCast(height));
+        return visited.data.len - count(Visited, visited.data, Visited.initEmpty());
     }
 
     var best_count: usize = 0;
 
     for (0..width) |x| {
-        try subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
-        best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
-        @memset(energized.data, false);
-        @memset(&S.visited, false);
+        try subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &visited, in, @intCast(width + 1), @intCast(height));
+        best_count = @max(best_count, visited.data.len - count(Visited, visited.data, Visited.initEmpty()));
+        @memset(visited.data, Visited.initEmpty());
 
-        try subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
-        best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
-        @memset(energized.data, false);
-        @memset(&S.visited, false);
+        try subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &visited, in, @intCast(width + 1), @intCast(height));
+        best_count = @max(best_count, visited.data.len - count(Visited, visited.data, Visited.initEmpty()));
+        @memset(visited.data, Visited.initEmpty());
     }
     for (0..height) |y| {
-        try subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
-        best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
-        @memset(energized.data, false);
-        @memset(&S.visited, false);
+        try subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &visited, in, @intCast(width + 1), @intCast(height));
+        best_count = @max(best_count, visited.data.len - count(Visited, visited.data, Visited.initEmpty()));
+        @memset(visited.data, Visited.initEmpty());
 
-        try subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
-        best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
-        @memset(energized.data, false);
-        @memset(&S.visited, false);
+        try subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &visited, in, @intCast(width + 1), @intCast(height));
+        best_count = @max(best_count, visited.data.len - count(Visited, visited.data, Visited.initEmpty()));
+        @memset(visited.data, Visited.initEmpty());
     }
 
     return best_count;
 }
 
-fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []const u8, width: u8, height: u8) !void {
+fn subsolve(state: State, visited: *Array2D(Visited), map: []const u8, width: u8, height: u8) !void {
     const right_idx = width - 2; // (Account for the \n)
     const bottom_idx = height - 1;
 
@@ -101,7 +95,10 @@ fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []co
     outer: while (true) {
         switch (curr_state.dir) {
             .r => while (curr_state.x <= right_idx) : (curr_state.x += 1) {
-                energized.set(curr_state.x, curr_state.y, true);
+                var tile_cache = visited.getPtr(curr_state.x, curr_state.y);
+                if (tile_cache.isSet(@intFromEnum(curr_state.dir))) return;
+                tile_cache.set(@intFromEnum(curr_state.dir));
+
                 switch (getAtPos(curr_state.x, curr_state.y, width, map)) {
                     '.', '-' => continue,
                     '/' => {
@@ -117,10 +114,7 @@ fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []co
                         continue :outer;
                     },
                     '|' => {
-                        if (visited[@as(u16, @bitCast(curr_state))]) return;
-                        visited[@as(u16, @bitCast(curr_state))] = true;
-
-                        if (curr_state.y != 0) try subsolve(curr_state.moveInDir(.u), visited, energized, map, width, height);
+                        if (curr_state.y != 0) try subsolve(curr_state.moveInDir(.u), visited, map, width, height);
                         if (curr_state.y == bottom_idx) return;
                         curr_state.dir = .d;
                         curr_state.y += 1;
@@ -130,7 +124,10 @@ fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []co
                 }
             },
             .l => while (curr_state.x >= 0) : (curr_state.x -= 1) {
-                energized.set(curr_state.x, curr_state.y, true);
+                var tile_cache = visited.getPtr(curr_state.x, curr_state.y);
+                if (tile_cache.isSet(@intFromEnum(curr_state.dir))) return;
+                tile_cache.set(@intFromEnum(curr_state.dir));
+
                 switch (getAtPos(curr_state.x, curr_state.y, width, map)) {
                     '.', '-' => {},
                     '/' => {
@@ -146,10 +143,7 @@ fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []co
                         continue :outer;
                     },
                     '|' => {
-                        if (visited[@as(u16, @bitCast(curr_state))]) return;
-                        visited[@as(u16, @bitCast(curr_state))] = true;
-
-                        if (curr_state.y != 0) try subsolve(curr_state.moveInDir(.u), visited, energized, map, width, height);
+                        if (curr_state.y != 0) try subsolve(curr_state.moveInDir(.u), visited, map, width, height);
                         if (curr_state.y == bottom_idx) return;
                         curr_state.dir = .d;
                         curr_state.y += 1;
@@ -160,7 +154,10 @@ fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []co
                 if (curr_state.x == 0) break;
             },
             .d => while (curr_state.y <= bottom_idx) : (curr_state.y += 1) {
-                energized.set(curr_state.x, curr_state.y, true);
+                var tile_cache = visited.getPtr(curr_state.x, curr_state.y);
+                if (tile_cache.isSet(@intFromEnum(curr_state.dir))) return;
+                tile_cache.set(@intFromEnum(curr_state.dir));
+
                 switch (getAtPos(curr_state.x, curr_state.y, width, map)) {
                     '.', '|' => continue,
                     '/' => {
@@ -176,10 +173,7 @@ fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []co
                         continue :outer;
                     },
                     '-' => {
-                        if (visited[@as(u16, @bitCast(curr_state))]) return;
-                        visited[@as(u16, @bitCast(curr_state))] = true;
-
-                        if (curr_state.x != 0) try subsolve(curr_state.moveInDir(.l), visited, energized, map, width, height);
+                        if (curr_state.x != 0) try subsolve(curr_state.moveInDir(.l), visited, map, width, height);
                         if (curr_state.x == right_idx) return;
                         curr_state.dir = .r;
                         curr_state.x += 1;
@@ -189,7 +183,10 @@ fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []co
                 }
             },
             .u => while (curr_state.y >= 0) : (curr_state.y -= 1) {
-                energized.set(curr_state.x, curr_state.y, true);
+                var tile_cache = visited.getPtr(curr_state.x, curr_state.y);
+                if (tile_cache.isSet(@intFromEnum(curr_state.dir))) return;
+                tile_cache.set(@intFromEnum(curr_state.dir));
+
                 switch (getAtPos(curr_state.x, curr_state.y, width, map)) {
                     '.', '|' => {},
                     '/' => {
@@ -205,10 +202,7 @@ fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []co
                         continue :outer;
                     },
                     '-' => {
-                        if (visited[@as(u16, @bitCast(curr_state))]) return;
-                        visited[@as(u16, @bitCast(curr_state))] = true;
-
-                        if (curr_state.x != 0) try subsolve(curr_state.moveInDir(.l), visited, energized, map, width, height);
+                        if (curr_state.x != 0) try subsolve(curr_state.moveInDir(.l), visited, map, width, height);
                         if (curr_state.x == right_idx) return;
                         curr_state.dir = .r;
                         curr_state.x += 1;
@@ -334,4 +328,12 @@ fn splitOnce(comptime T: type, haystack: []const T, needle: []const T) struct { 
 fn splitOnceScalar(comptime T: type, buffer: []const T, delimiter: T) struct { []const T, []const T } {
     const idx = std.mem.indexOfScalar(T, buffer, delimiter) orelse return .{ buffer, &.{} };
     return .{ buffer[0..idx], buffer[(idx + 1)..] };
+}
+
+fn count(comptime T: type, buffer: []const T, target: T) usize {
+    var result: usize = 0;
+    for (buffer) |element| {
+        if (std.meta.eql(element, target)) result += 1;
+    }
+    return result;
 }
