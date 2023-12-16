@@ -32,14 +32,14 @@ test "Part 2" {
 const MemoKey = packed struct(u16) { record_idx: u8, group_idx: u8 };
 const memo_map_size = std.math.maxInt(u16);
 
-fn subsolve(record: []const u8, groups: []const u32, record_idx: u8, group_idx: u8, memo: *[memo_map_size]u64) u64 {
+fn subsolve(record: []u8, groups: []const u32, record_idx: u8, group_idx: u8, memo: *[memo_map_size]u64) u64 {
     // Discard "."s
     var idx: usize = record_idx;
     while (idx < record.len and record[idx] == '.') {
         idx += 1;
     }
 
-    if (idx == record.len) {
+    if (idx >= record.len) {
         return if (group_idx == groups.len) 1 else 0;
     }
 
@@ -70,28 +70,22 @@ fn subsolve(record: []const u8, groups: []const u32, record_idx: u8, group_idx: 
             return 0;
         }
 
-        // Take first group and recurse
-        // Includes bounding char if not OOB
-        const extra_take: usize = if (start_idx + size == record.len) 0 else 1;
-        const result = subsolve(record, groups, @intCast(start_idx + size + extra_take), group_idx + 1, memo);
+        // +1 is for the . / ? wich needs to follow
+        const result = subsolve(record, groups, @intCast(start_idx + size + 1), group_idx + 1, memo);
         // Caching this seems to be hurting performace
         // memo[@as(u16, @bitCast(memo_key))] = result;
         return result;
     } else { // "?"
-
-        var curr = [_]u8{undefined} ** 128; // Should be enought for all records
-        @memcpy(curr[record_idx..record.len], record[record_idx..]);
-
         var result: u64 = 0;
 
-        curr[idx] = '#';
-        result += subsolve(curr[0..record.len], groups, @intCast(idx), group_idx, memo);
-        result += subsolve(curr[0..record.len], groups, @intCast(idx + 1), group_idx, memo);
+        record[idx] = '#';
+        result += subsolve(record, groups, @intCast(idx), group_idx, memo);
+        result += subsolve(record, groups, @intCast(idx + 1), group_idx, memo);
+        record[idx] = '?';
 
         memo[@as(u16, @bitCast(memo_key))] = result;
         return result;
     }
-    unreachable;
 }
 
 var memo_map = [_]u64{undefined} ** memo_map_size;
@@ -124,7 +118,8 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
             }
         }
 
-        const record = if (part == .one) record_text else bloated_record_text.items;
+        const record = if (part == .one) try allocator.dupe(u8, record_text) else bloated_record_text.items;
+        defer if (part == .one) allocator.free(record);
         const group_counts = if (part == .one) group_counts_text else bloated_group_text.items;
 
         var group_iter = splitSca(u8, group_counts, ',');
