@@ -12,6 +12,10 @@ const example2 = @embedFile("example2.txt");
 const Array2D = @import("array2d.zig").Array2D;
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -21,25 +25,13 @@ pub fn main() !void {
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {
-    try std.testing.expectEqual(@as(u64, 2), try solve(.one, example1, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 46), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
-    try std.testing.expectEqual(@as(u64, 6), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 51), try solve(.two, example1, std.testing.allocator));
 }
 
-const Dir = enum(u2) {
-    l,
-    u,
-    r,
-    d,
-
-    pub fn rotateCW(dir: Dir) Dir {
-        return @enumFromInt(@intFromEnum(dir) +% 1);
-    }
-    pub fn rotateCCW(dir: Dir) Dir {
-        return @enumFromInt(@intFromEnum(dir) -% 1);
-    }
-};
+const Dir = enum(u2) { l, u, r, d };
 const State = packed struct(u16) {
     x: u7,
     y: u7,
@@ -54,24 +46,55 @@ const State = packed struct(u16) {
         };
     }
 };
+const StateSet = AutoHashSet(State);
+// const StateSet = HashSet(State, IntegerHashmapCtx(State), std.hash_map.default_max_load_percentage);
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').? + 1;
     const height = in.len / width;
 
-    _ = part;
     var energized = try Array2D(bool).initWithDefault(allocator, width, height, false);
-    var visited = AutoHashSet(State).init(allocator);
+    defer energized.deinit(allocator);
+    var visited = StateSet.init(allocator);
     defer visited.deinit();
 
-    try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &visited, &energized, in, @intCast(width), @intCast(height));
+    if (part == .one) {
+        try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &visited, &energized, in, @intCast(width), @intCast(height));
 
-    std.debug.print("\n{c}", .{energized});
+        // std.debug.print("\n{c}", .{energized});
 
-    return std.mem.count(bool, energized.data, &.{true});
+        return std.mem.count(bool, energized.data, &.{true});
+    }
+
+    var best_count: usize = 0;
+
+    for (0..width) |x| {
+        try subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &visited, &energized, in, @intCast(width), @intCast(height));
+        best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
+        @memset(energized.data, false);
+        visited.clearRetainingCapacity();
+
+        try subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &visited, &energized, in, @intCast(width), @intCast(height));
+        best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
+        @memset(energized.data, false);
+        visited.clearRetainingCapacity();
+    }
+    for (0..height) |y| {
+        try subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &visited, &energized, in, @intCast(width), @intCast(height));
+        best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
+        @memset(energized.data, false);
+        visited.clearRetainingCapacity();
+
+        try subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &visited, &energized, in, @intCast(width), @intCast(height));
+        best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
+        @memset(energized.data, false);
+        visited.clearRetainingCapacity();
+    }
+
+    return best_count;
 }
 
-fn subsolve(state: State, visited: *AutoHashSet(State), energized: *Array2D(bool), map: []const u8, width: u8, height: u8) !void {
+fn subsolve(state: State, visited: *StateSet, energized: *Array2D(bool), map: []const u8, width: u8, height: u8) !void {
     if (visited.contains(state)) return;
     try visited.put(state, {});
 
@@ -180,12 +203,18 @@ const desc = std.sort.desc;
 fn AutoHashSet(comptime T: type) type {
     return std.AutoHashMap(T, void);
 }
+fn HashSet(comptime T: type, comptime Context: anytype, comptime max_load_percentage: u64) type {
+    return std.HashMap(T, void, Context, max_load_percentage);
+}
 
 fn getAtPos(x: usize, y: usize, width: usize, buf: []const u8) u8 {
     return buf[y * width + x];
 }
+fn setAtPos(comptime T: type, x: usize, y: usize, width: usize, buf: [*]T, value: T) void {
+    buf[y * width + x] = value;
+}
 
-fn SliceHashmapCtx(comptime T: type) type {
+fn SliceArrayHashmapCtx(comptime T: type) type {
     if (T == u8)
         @compileError("Use a StringHashMap instead when using a []const u8 key");
     return struct {
@@ -199,6 +228,43 @@ fn SliceHashmapCtx(comptime T: type) type {
         }
     };
 }
+// TODO: Improve this lol
+// fn IntegerHashmapCtx(comptime T: type) type {
+//     switch (@typeInfo(T)) {
+//         .Struct => |info| {
+//             if (info.backing_integer == null) @compileError("Struct must be backed by an integer");
+//             return struct {
+//                 pub fn hash(_: @This(), key: T) u64 {
+//                     return @as(info.backing_integer.?, @bitCast(key));
+//                 }
+//                 pub fn eql(_: @This(), a: T, b: T) bool {
+//                     return @as(info.backing_integer.?, @bitCast(a)) == @as(info.backing_integer.?, @bitCast(b));
+//                 }
+//             };
+//         },
+//         .Enum => {
+//             return struct {
+//                 pub fn hash(_: @This(), key: T) u64 {
+//                     return @intFromEnum(key);
+//                 }
+//                 pub fn eql(_: @This(), a: T, b: T) bool {
+//                     return a == b;
+//                 }
+//             };
+//         },
+//         .Int => {
+//             return struct {
+//                 pub fn hash(_: @This(), key: T) u64 {
+//                     return key;
+//                 }
+//                 pub fn eql(_: @This(), a: T, b: T) bool {
+//                     return a == b;
+//                 }
+//             };
+//         },
+//         else => @compileError("Key must be an integer type or a type backed by an integer"),
+//     }
+// }
 
 fn lcm(a: u64, b: u64) u64 {
     return a * b / std.math.gcd(a, b);
