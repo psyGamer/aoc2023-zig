@@ -17,12 +17,14 @@ pub const std_options = struct {
 };
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    for (0..100) |_| {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const allocator = arena.allocator();
 
-    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+        std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
+        std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+    }
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 46), try solve(.one, example1, std.testing.allocator));
@@ -39,7 +41,7 @@ const State = packed struct(u16) {
     y: u7,
     dir: Dir,
 
-    pub fn moveInDir(state: State, dir: Dir) State {
+    pub inline fn moveInDir(state: State, comptime dir: Dir) State {
         return switch (dir) {
             .l => .{ .x = state.x - 1, .y = state.y, .dir = dir },
             .r => .{ .x = state.x + 1, .y = state.y, .dir = dir },
@@ -57,27 +59,27 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     defer visited.deinit(allocator);
 
     if (part == .one) {
-        try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &visited, in, @intCast(width + 1), @intCast(height));
+        subsolve(.{ .x = 0, .y = 0, .dir = .r }, &visited, in, @intCast(width + 1), @intCast(height));
         return visited.data.len - count(Visited, visited.data, Visited.initEmpty());
     }
 
     var best_count: usize = 0;
 
     for (0..width) |x| {
-        try subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &visited, in, @intCast(width + 1), @intCast(height));
+        subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &visited, in, @intCast(width + 1), @intCast(height));
         best_count = @max(best_count, visited.data.len - count(Visited, visited.data, Visited.initEmpty()));
         @memset(visited.data, Visited.initEmpty());
 
-        try subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &visited, in, @intCast(width + 1), @intCast(height));
+        subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &visited, in, @intCast(width + 1), @intCast(height));
         best_count = @max(best_count, visited.data.len - count(Visited, visited.data, Visited.initEmpty()));
         @memset(visited.data, Visited.initEmpty());
     }
     for (0..height) |y| {
-        try subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &visited, in, @intCast(width + 1), @intCast(height));
+        subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &visited, in, @intCast(width + 1), @intCast(height));
         best_count = @max(best_count, visited.data.len - count(Visited, visited.data, Visited.initEmpty()));
         @memset(visited.data, Visited.initEmpty());
 
-        try subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &visited, in, @intCast(width + 1), @intCast(height));
+        subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &visited, in, @intCast(width + 1), @intCast(height));
         best_count = @max(best_count, visited.data.len - count(Visited, visited.data, Visited.initEmpty()));
         @memset(visited.data, Visited.initEmpty());
     }
@@ -85,7 +87,7 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     return best_count;
 }
 
-fn subsolve(state: State, visited: *Array2D(Visited), map: []const u8, width: u8, height: u8) !void {
+fn subsolve(state: State, visited: *Array2D(Visited), map: []const u8, width: u8, height: u8) void {
     const right_idx = width - 2; // (Account for the \n)
     const bottom_idx = height - 1;
 
@@ -114,7 +116,7 @@ fn subsolve(state: State, visited: *Array2D(Visited), map: []const u8, width: u8
                         continue :outer;
                     },
                     '|' => {
-                        if (curr_state.y != 0) try subsolve(curr_state.moveInDir(.u), visited, map, width, height);
+                        if (curr_state.y != 0) subsolve(curr_state.moveInDir(.u), visited, map, width, height);
                         if (curr_state.y == bottom_idx) return;
                         curr_state.dir = .d;
                         curr_state.y += 1;
@@ -143,7 +145,7 @@ fn subsolve(state: State, visited: *Array2D(Visited), map: []const u8, width: u8
                         continue :outer;
                     },
                     '|' => {
-                        if (curr_state.y != 0) try subsolve(curr_state.moveInDir(.u), visited, map, width, height);
+                        if (curr_state.y != 0) subsolve(curr_state.moveInDir(.u), visited, map, width, height);
                         if (curr_state.y == bottom_idx) return;
                         curr_state.dir = .d;
                         curr_state.y += 1;
@@ -173,7 +175,7 @@ fn subsolve(state: State, visited: *Array2D(Visited), map: []const u8, width: u8
                         continue :outer;
                     },
                     '-' => {
-                        if (curr_state.x != 0) try subsolve(curr_state.moveInDir(.l), visited, map, width, height);
+                        if (curr_state.x != 0) subsolve(curr_state.moveInDir(.l), visited, map, width, height);
                         if (curr_state.x == right_idx) return;
                         curr_state.dir = .r;
                         curr_state.x += 1;
@@ -202,7 +204,7 @@ fn subsolve(state: State, visited: *Array2D(Visited), map: []const u8, width: u8
                         continue :outer;
                     },
                     '-' => {
-                        if (curr_state.x != 0) try subsolve(curr_state.moveInDir(.l), visited, map, width, height);
+                        if (curr_state.x != 0) subsolve(curr_state.moveInDir(.l), visited, map, width, height);
                         if (curr_state.x == right_idx) return;
                         curr_state.dir = .r;
                         curr_state.x += 1;
