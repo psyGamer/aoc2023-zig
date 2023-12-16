@@ -46,8 +46,6 @@ const State = packed struct(u16) {
         };
     }
 };
-const StateSet = AutoHashSet(State);
-// const StateSet = HashSet(State, IntegerHashmapCtx(State), std.hash_map.default_max_load_percentage);
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').? + 1;
@@ -55,48 +53,48 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
 
     var energized = try Array2D(bool).initWithDefault(allocator, width, height, false);
     defer energized.deinit(allocator);
-    var visited = StateSet.init(allocator);
-    defer visited.deinit();
+
+    const S = struct {
+        var visited = [_]bool{false} ** std.math.maxInt(u16);
+    };
 
     if (part == .one) {
-        try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &visited, &energized, in, @intCast(width), @intCast(height));
-
-        // std.debug.print("\n{c}", .{energized});
-
+        try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &S.visited, &energized, in, @intCast(width), @intCast(height));
         return std.mem.count(bool, energized.data, &.{true});
     }
 
     var best_count: usize = 0;
 
     for (0..width) |x| {
-        try subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &S.visited, &energized, in, @intCast(width), @intCast(height));
         best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
         @memset(energized.data, false);
-        visited.clearRetainingCapacity();
+        @memset(&S.visited, false);
 
-        try subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &S.visited, &energized, in, @intCast(width), @intCast(height));
         best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
         @memset(energized.data, false);
-        visited.clearRetainingCapacity();
+        @memset(&S.visited, false);
     }
     for (0..height) |y| {
-        try subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &S.visited, &energized, in, @intCast(width), @intCast(height));
         best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
         @memset(energized.data, false);
-        visited.clearRetainingCapacity();
+        @memset(&S.visited, false);
 
-        try subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &S.visited, &energized, in, @intCast(width), @intCast(height));
         best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
         @memset(energized.data, false);
-        visited.clearRetainingCapacity();
+        @memset(&S.visited, false);
     }
 
     return best_count;
 }
 
-fn subsolve(state: State, visited: *StateSet, energized: *Array2D(bool), map: []const u8, width: u8, height: u8) !void {
-    if (visited.contains(state)) return;
-    try visited.put(state, {});
+fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []const u8, width: u8, height: u8) !void {
+    const visited_key: u16 = @bitCast(state);
+    if (visited[visited_key]) return;
+    visited[visited_key] = true;
 
     const tile = getAtPos(state.x, state.y, width, map);
     if (tile == '\n') return;
