@@ -48,8 +48,8 @@ const State = packed struct(u16) {
 };
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    const width = indexOf(u8, in, '\n').? + 1;
-    const height = in.len / width;
+    const width = indexOf(u8, in, '\n').?;
+    const height = in.len / (width + 1);
 
     var energized = try Array2D(bool).initWithDefault(allocator, width, height, false);
     defer energized.deinit(allocator);
@@ -59,30 +59,30 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     };
 
     if (part == .one) {
-        try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &S.visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = 0, .y = 0, .dir = .r }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
         return std.mem.count(bool, energized.data, &.{true});
     }
 
     var best_count: usize = 0;
 
     for (0..width) |x| {
-        try subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &S.visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = @intCast(x), .y = 0, .dir = .d }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
         best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
         @memset(energized.data, false);
         @memset(&S.visited, false);
 
-        try subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &S.visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = @intCast(x), .y = @intCast(height - 1), .dir = .u }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
         best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
         @memset(energized.data, false);
         @memset(&S.visited, false);
     }
     for (0..height) |y| {
-        try subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &S.visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = 0, .y = @intCast(y), .dir = .r }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
         best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
         @memset(energized.data, false);
         @memset(&S.visited, false);
 
-        try subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &S.visited, &energized, in, @intCast(width), @intCast(height));
+        try subsolve(.{ .x = @intCast(width - 1), .y = @intCast(y), .dir = .l }, &S.visited, &energized, in, @intCast(width + 1), @intCast(height));
         best_count = @max(best_count, std.mem.count(bool, energized.data, &.{true}));
         @memset(energized.data, false);
         @memset(&S.visited, false);
@@ -92,83 +92,136 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
 }
 
 fn subsolve(state: State, visited: [*]bool, energized: *Array2D(bool), map: []const u8, width: u8, height: u8) !void {
-    const visited_key: u16 = @bitCast(state);
-    if (visited[visited_key]) return;
-    visited[visited_key] = true;
+    const right_idx = width - 2; // (Account for the \n)
+    const bottom_idx = height - 1;
 
-    const tile = getAtPos(state.x, state.y, width, map);
-    if (tile == '\n') return;
-    energized.set(state.x, state.y, true);
+    var curr_state = state;
+    // To avoid checking unnessecary bounds, we use this weird loop setup
+    // gotos would actually make this better, but they don't exist
+    outer: while (true) {
+        switch (curr_state.dir) {
+            .r => while (curr_state.x <= right_idx) : (curr_state.x += 1) {
+                energized.set(curr_state.x, curr_state.y, true);
+                switch (getAtPos(curr_state.x, curr_state.y, width, map)) {
+                    '.', '-' => continue,
+                    '/' => {
+                        if (curr_state.y == 0) return;
+                        curr_state.dir = .u;
+                        curr_state.y -= 1;
+                        continue :outer;
+                    },
+                    '\\' => {
+                        if (curr_state.y == bottom_idx) return;
+                        curr_state.dir = .d;
+                        curr_state.y += 1;
+                        continue :outer;
+                    },
+                    '|' => {
+                        if (visited[@as(u16, @bitCast(curr_state))]) return;
+                        visited[@as(u16, @bitCast(curr_state))] = true;
 
-    switch (tile) {
-        '.' => {
-            if (state.dir == .l and state.x == 0 or state.dir == .r and state.x == width - 1 or
-                state.dir == .u and state.y == 0 or state.dir == .d and state.y == height - 1)
-            {
-                return;
-            }
-            try subsolve(state.moveInDir(state.dir), visited, energized, map, width, height);
-        },
-        '/' => {
-            const new_dir: Dir = switch (state.dir) {
-                .r => .u,
-                .u => .r,
-                .l => .d,
-                .d => .l,
-            };
-            if (new_dir == .l and state.x == 0 or new_dir == .r and state.x == width - 1 or
-                new_dir == .u and state.y == 0 or new_dir == .d and state.y == height - 1)
-            {
-                return;
-            }
-
-            try subsolve(state.moveInDir(new_dir), visited, energized, map, width, height);
-        },
-        '\\' => {
-            const new_dir: Dir = switch (state.dir) {
-                .r => .d,
-                .d => .r,
-                .l => .u,
-                .u => .l,
-            };
-            if (new_dir == .l and state.x == 0 or new_dir == .r and state.x == width - 1 or
-                new_dir == .u and state.y == 0 or new_dir == .d and state.y == height - 1)
-            {
-                return;
-            }
-
-            try subsolve(state.moveInDir(new_dir), visited, energized, map, width, height);
-        },
-        '-' => {
-            if (state.dir == .l or state.dir == .r) {
-                if (state.dir == .l and state.x == 0 or state.dir == .r and state.x == width - 1) {
-                    return;
+                        if (curr_state.y != 0) try subsolve(curr_state.moveInDir(.u), visited, energized, map, width, height);
+                        if (curr_state.y == bottom_idx) return;
+                        curr_state.dir = .d;
+                        curr_state.y += 1;
+                        continue :outer;
+                    },
+                    else => unreachable,
                 }
-                try subsolve(state.moveInDir(state.dir), visited, energized, map, width, height);
-                return;
-            }
+            },
+            .l => while (curr_state.x >= 0) : (curr_state.x -= 1) {
+                energized.set(curr_state.x, curr_state.y, true);
+                switch (getAtPos(curr_state.x, curr_state.y, width, map)) {
+                    '.', '-' => {},
+                    '/' => {
+                        if (curr_state.y == bottom_idx) return;
+                        curr_state.dir = .d;
+                        curr_state.y += 1;
+                        continue :outer;
+                    },
+                    '\\' => {
+                        if (curr_state.y == 0) return;
+                        curr_state.dir = .u;
+                        curr_state.y -= 1;
+                        continue :outer;
+                    },
+                    '|' => {
+                        if (visited[@as(u16, @bitCast(curr_state))]) return;
+                        visited[@as(u16, @bitCast(curr_state))] = true;
 
-            if (state.x != 0) try subsolve(state.moveInDir(.l), visited, energized, map, width, height);
-            if (state.x != width - 1) try subsolve(state.moveInDir(.r), visited, energized, map, width, height);
-        },
-        '|' => {
-            if (state.dir == .u or state.dir == .d) {
-                if (state.dir == .u and state.y == 0 or state.dir == .d and state.y == height - 1) {
-                    return;
+                        if (curr_state.y != 0) try subsolve(curr_state.moveInDir(.u), visited, energized, map, width, height);
+                        if (curr_state.y == bottom_idx) return;
+                        curr_state.dir = .d;
+                        curr_state.y += 1;
+                        continue :outer;
+                    },
+                    else => unreachable,
                 }
-                try subsolve(state.moveInDir(state.dir), visited, energized, map, width, height);
-                return;
-            }
+                if (curr_state.x == 0) break;
+            },
+            .d => while (curr_state.y <= bottom_idx) : (curr_state.y += 1) {
+                energized.set(curr_state.x, curr_state.y, true);
+                switch (getAtPos(curr_state.x, curr_state.y, width, map)) {
+                    '.', '|' => continue,
+                    '/' => {
+                        if (curr_state.x == 0) return;
+                        curr_state.dir = .l;
+                        curr_state.x -= 1;
+                        continue :outer;
+                    },
+                    '\\' => {
+                        if (curr_state.x == right_idx) return;
+                        curr_state.dir = .r;
+                        curr_state.x += 1;
+                        continue :outer;
+                    },
+                    '-' => {
+                        if (visited[@as(u16, @bitCast(curr_state))]) return;
+                        visited[@as(u16, @bitCast(curr_state))] = true;
 
-            if (state.y != 0) try subsolve(state.moveInDir(.u), visited, energized, map, width, height);
-            if (state.y != height - 1) try subsolve(state.moveInDir(.d), visited, energized, map, width, height);
-        },
-        else => {
-            unreachable;
-        },
+                        if (curr_state.x != 0) try subsolve(curr_state.moveInDir(.l), visited, energized, map, width, height);
+                        if (curr_state.x == right_idx) return;
+                        curr_state.dir = .r;
+                        curr_state.x += 1;
+                        continue :outer;
+                    },
+                    else => unreachable,
+                }
+            },
+            .u => while (curr_state.y >= 0) : (curr_state.y -= 1) {
+                energized.set(curr_state.x, curr_state.y, true);
+                switch (getAtPos(curr_state.x, curr_state.y, width, map)) {
+                    '.', '|' => {},
+                    '/' => {
+                        if (curr_state.x == right_idx) return;
+                        curr_state.dir = .r;
+                        curr_state.x += 1;
+                        continue :outer;
+                    },
+                    '\\' => {
+                        if (curr_state.x == 0) return;
+                        curr_state.dir = .l;
+                        curr_state.x -= 1;
+                        continue :outer;
+                    },
+                    '-' => {
+                        if (visited[@as(u16, @bitCast(curr_state))]) return;
+                        visited[@as(u16, @bitCast(curr_state))] = true;
+
+                        if (curr_state.x != 0) try subsolve(curr_state.moveInDir(.l), visited, energized, map, width, height);
+                        if (curr_state.x == right_idx) return;
+                        curr_state.dir = .r;
+                        curr_state.x += 1;
+                        continue :outer;
+                    },
+                    else => unreachable,
+                }
+                if (curr_state.y == 0) break;
+            },
+        }
+        // We hit out-of-bounds and ended the inner loop
+        return;
     }
-
-    // _ = energized;
 }
 
 // Useful stdlib functions
