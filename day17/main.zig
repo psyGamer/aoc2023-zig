@@ -49,7 +49,7 @@ fn Node(comptime part: Part) type {
         const minimum_dist = if (part == .one) 0 else 4;
         const maximum_dist = if (part == .one) 3 else 10;
 
-        pub fn canLeft(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
+        pub inline fn canLeft(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
             if (n.dist < minimum_dist) return null;
             var new: Self = b: {
                 switch (n.dir) {
@@ -75,7 +75,7 @@ fn Node(comptime part: Part) type {
             return new;
         }
 
-        pub fn canRight(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
+        pub inline fn canRight(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
             if (n.dist < minimum_dist) return null;
             var new: Self = b: {
                 switch (n.dir) {
@@ -101,7 +101,7 @@ fn Node(comptime part: Part) type {
             return new;
         }
 
-        pub fn canForw(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
+        pub inline fn canForward(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
             if (n.dist >= maximum_dist) return null;
             var new: Self = b: {
                 switch (n.dir) {
@@ -127,14 +127,16 @@ fn Node(comptime part: Part) type {
             return new;
         }
 
-        pub fn getKey(n: Self) u16 {
+        pub inline fn getKey(n: Self) u16 {
             return @as(u16, n.y) << 8 | n.x;
         }
-        pub fn getCost(n: Self, width: usize, buffer: []const u8) u8 {
+        pub inline fn getCost(n: Self, width: usize, buffer: []const u8) u8 {
             return getAtPos(n.x, n.y, width + 1, buffer) - '0';
         }
         pub fn compare(_: void, a: Self, b: Self) std.math.Order {
-            return std.math.order(a.total_dist, b.total_dist);
+            // When adding, it only checks for != .lt, so .eq and .gt can be treated the same
+            if (a.total_dist >= b.total_dist) return .gt;
+            return .lt;
         }
     };
 }
@@ -142,13 +144,6 @@ fn Node(comptime part: Part) type {
 // Bitset for each direction. Each bit determines if the node was visited with that dist.
 // The 1/10 can't be cached by this, because a u9 would hurt performance more.
 const Visited = [4]std.StaticBitSet(8);
-
-fn addNullableSliceToQueue(comptime T: type, comptime len: usize, queue: anytype, slice: [len]?T) !void {
-    try queue.ensureUnusedCapacity(slice.len);
-    inline for (slice[0..len]) |maybe_e| {
-        if (maybe_e) |e| queue.add(e) catch unreachable;
-    }
-}
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').?;
@@ -163,11 +158,15 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     var queue = std.PriorityQueue(Node(part), void, Node(part).compare).init(allocator, {});
     defer queue.deinit();
 
-    try addNullableSliceToQueue(Node(part), 3, &queue, [_]?Node(part){
+    var neighbours = [_]?Node(part){
         start.canLeft(width, height, in),
         start.canRight(width, height, in),
-        start.canForw(width, height, in),
-    });
+        start.canForward(width, height, in),
+    };
+    queue.ensureUnusedCapacity(3) catch unreachable;
+    if (neighbours[0]) |e| queue.add(e) catch unreachable;
+    if (neighbours[1]) |e| queue.add(e) catch unreachable;
+    if (neighbours[2]) |e| queue.add(e) catch unreachable;
 
     while (queue.removeOrNull()) |curr| {
         const visited_ptr = &visited[curr.getKey()][@intFromEnum(curr.dir)];
@@ -180,12 +179,15 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
             return curr.total_dist;
         }
 
-        const neighbours = [_]?Node(part){
+        neighbours = [_]?Node(part){
             curr.canLeft(width, height, in),
             curr.canRight(width, height, in),
-            curr.canForw(width, height, in),
+            curr.canForward(width, height, in),
         };
-        try addNullableSliceToQueue(Node(part), neighbours.len, &queue, neighbours);
+        queue.ensureUnusedCapacity(3) catch unreachable;
+        if (neighbours[0]) |e| queue.add(e) catch unreachable;
+        if (neighbours[1]) |e| queue.add(e) catch unreachable;
+        if (neighbours[2]) |e| queue.add(e) catch unreachable;
     }
 
     unreachable;
