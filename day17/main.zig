@@ -17,12 +17,14 @@ pub const std_options = struct {
 };
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    for (0..10) |_| {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const allocator = arena.allocator();
 
-    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+        std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
+        std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+    }
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 102), try solve(.one, example1, std.testing.allocator));
@@ -35,114 +37,111 @@ test "Part 2" {
 const Dir = enum(u2) { l, r, u, d };
 
 fn Node(comptime part: Part) type {
-    return packed struct(u24) {
+    return struct {
         const Self = @This();
 
         x: u8,
         y: u8,
         dir: Dir,
-        dist: u6,
+        dist: u8,
+        total_dist: u32,
 
         const minimum_dist = if (part == .one) 0 else 4;
         const maximum_dist = if (part == .one) 3 else 10;
 
-        pub fn canLeft(n: Self, width: usize, height: usize) ?Self {
+        pub fn canLeft(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
             if (n.dist < minimum_dist) return null;
-            switch (n.dir) {
-                .r => {
-                    if (n.y == 0) return null;
-                    return .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = 1 };
-                },
-                .l => {
-                    if (n.y == height - 1) return null;
-                    return .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = 1 };
-                },
-                .u => {
-                    if (n.x == 0) return null;
-                    return .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = 1 };
-                },
-                .d => {
-                    if (n.x == width - 1) return null;
-                    return .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = 1 };
-                },
-            }
+            var new: Self = b: {
+                switch (n.dir) {
+                    .r => {
+                        if (n.y == 0) return null;
+                        break :b .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = 1, .total_dist = undefined };
+                    },
+                    .l => {
+                        if (n.y == height - 1) return null;
+                        break :b .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = 1, .total_dist = undefined };
+                    },
+                    .u => {
+                        if (n.x == 0) return null;
+                        break :b .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = 1, .total_dist = undefined };
+                    },
+                    .d => {
+                        if (n.x == width - 1) return null;
+                        break :b .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = 1, .total_dist = undefined };
+                    },
+                }
+            };
+            new.total_dist = n.total_dist + new.getCost(width, buffer);
+            return new;
         }
 
-        pub fn canRight(n: Self, width: usize, height: usize) ?Self {
+        pub fn canRight(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
             if (n.dist < minimum_dist) return null;
-            switch (n.dir) {
-                .l => {
-                    if (n.y == 0) return null;
-                    return .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = 1 };
-                },
-                .r => {
-                    if (n.y == height - 1) return null;
-                    return .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = 1 };
-                },
-                .d => {
-                    if (n.x == 0) return null;
-                    return .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = 1 };
-                },
-                .u => {
-                    if (n.x == width - 1) return null;
-                    return .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = 1 };
-                },
-            }
+            var new: Self = b: {
+                switch (n.dir) {
+                    .l => {
+                        if (n.y == 0) return null;
+                        break :b .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = 1, .total_dist = undefined };
+                    },
+                    .r => {
+                        if (n.y == height - 1) return null;
+                        break :b .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = 1, .total_dist = undefined };
+                    },
+                    .d => {
+                        if (n.x == 0) return null;
+                        break :b .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = 1, .total_dist = undefined };
+                    },
+                    .u => {
+                        if (n.x == width - 1) return null;
+                        break :b .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = 1, .total_dist = undefined };
+                    },
+                }
+            };
+            new.total_dist = n.total_dist + new.getCost(width, buffer);
+            return new;
         }
 
-        pub fn canForw(n: Self, width: usize, height: usize) ?Self {
+        pub fn canForw(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
             if (n.dist >= maximum_dist) return null;
-            switch (n.dir) {
-                .l => {
-                    if (n.x == 0) return null;
-                    return .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = n.dist + 1 };
-                },
-                .r => {
-                    if (n.x == width - 1) return null;
-                    return .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = n.dist + 1 };
-                },
-                .u => {
-                    if (n.y == 0) return null;
-                    return .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = n.dist + 1 };
-                },
-                .d => {
-                    if (n.y == height - 1) return null;
-                    return .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = n.dist + 1 };
-                },
-            }
+            var new: Self = b: {
+                switch (n.dir) {
+                    .l => {
+                        if (n.x == 0) return null;
+                        break :b .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = n.dist + 1, .total_dist = undefined };
+                    },
+                    .r => {
+                        if (n.x == width - 1) return null;
+                        break :b .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = n.dist + 1, .total_dist = undefined };
+                    },
+                    .u => {
+                        if (n.y == 0) return null;
+                        break :b .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = n.dist + 1, .total_dist = undefined };
+                    },
+                    .d => {
+                        if (n.y == height - 1) return null;
+                        break :b .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = n.dist + 1, .total_dist = undefined };
+                    },
+                }
+            };
+            new.total_dist = n.total_dist + new.getCost(width, buffer);
+            return new;
         }
 
+        pub fn getKey(n: Self) u16 {
+            return @as(u16, n.y) << 8 | n.x;
+        }
         pub fn getCost(n: Self, width: usize, buffer: []const u8) u8 {
             return getAtPos(n.x, n.y, width + 1, buffer) - '0';
         }
-    };
-}
-
-fn DistanceNode(comptime part: Part) type {
-    return struct {
-        const Self = @This();
-
-        dist: u32,
-        node: Node(part),
-
-        pub fn canLeft(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
-            var new = n.node.canLeft(width, height) orelse return null;
-            return .{ .dist = n.dist + new.getCost(width, buffer), .node = new };
-        }
-        pub fn canRight(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
-            var new = n.node.canRight(width, height) orelse return null;
-            return .{ .dist = n.dist + new.getCost(width, buffer), .node = new };
-        }
-        pub fn canForw(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
-            var new = n.node.canForw(width, height) orelse return null;
-            return .{ .dist = n.dist + new.getCost(width, buffer), .node = new };
-        }
-
         pub fn compare(_: void, a: Self, b: Self) std.math.Order {
-            return std.math.order(a.dist, b.dist);
+            return std.math.order(a.total_dist, b.total_dist);
         }
     };
 }
+
+// Bitset for each direction. Each bit determines if the node was visited with that dist.
+// The 1/10 can't be cached by this, because a u9 would hurt performance more.
+const Visited = [4]std.StaticBitSet(8);
 
 fn addNullableSliceToQueue(comptime T: type, comptime len: usize, queue: anytype, slice: [len]?T) !void {
     try queue.ensureUnusedCapacity(slice.len);
@@ -155,37 +154,38 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').?;
     const height = in.len / (width + 1);
 
-    const start: DistanceNode(part) = .{ .dist = 0, .node = .{ .x = 0, .y = 0, .dir = .r, .dist = 0 } };
+    const start: Node(part) = .{ .x = 0, .y = 0, .dir = .r, .dist = 0, .total_dist = 0 };
 
-    var visited = try allocator.alloc(bool, std.math.maxInt(u24));
+    var visited = try allocator.alloc(Visited, std.math.maxInt(u16));
     defer allocator.free(visited);
-    @memset(visited, false);
+    @memset(visited, [_]std.StaticBitSet(8){std.StaticBitSet(8).initEmpty()} ** 4);
 
-    var queue = std.PriorityQueue(DistanceNode(part), void, DistanceNode(part).compare).init(allocator, {});
+    var queue = std.PriorityQueue(Node(part), void, Node(part).compare).init(allocator, {});
     defer queue.deinit();
 
-    try addNullableSliceToQueue(DistanceNode(part), 3, &queue, [_]?DistanceNode(part){
+    try addNullableSliceToQueue(Node(part), 3, &queue, [_]?Node(part){
         start.canLeft(width, height, in),
         start.canRight(width, height, in),
         start.canForw(width, height, in),
     });
 
     while (queue.removeOrNull()) |curr| {
-        // if (memo.get(curr)) |memo_val| if (curr.distance >= memo_val) continue;
-        // try memo.put(curr, curr.distance);
-        if (visited[@as(u24, @bitCast(curr.node))]) continue;
-        visited[@as(u24, @bitCast(curr.node))] = true;
-
-        if (curr.node.x == width - 1 and curr.node.y == height - 1 and curr.node.dist >= Node(part).minimum_dist) {
-            return curr.dist;
+        const visited_ptr = &visited[curr.getKey()][@intFromEnum(curr.dir)];
+        if (curr.dist <= 8) {
+            if (visited_ptr.isSet(curr.dist - 1)) continue;
+            visited_ptr.set(curr.dist - 1);
         }
 
-        const neighbours = [_]?DistanceNode(part){
+        if (curr.x == width - 1 and curr.y == height - 1 and curr.dist >= Node(part).minimum_dist) {
+            return curr.total_dist;
+        }
+
+        const neighbours = [_]?Node(part){
             curr.canLeft(width, height, in),
             curr.canRight(width, height, in),
             curr.canForw(width, height, in),
         };
-        try addNullableSliceToQueue(DistanceNode(part), neighbours.len, &queue, neighbours);
+        try addNullableSliceToQueue(Node(part), neighbours.len, &queue, neighbours);
     }
 
     unreachable;
