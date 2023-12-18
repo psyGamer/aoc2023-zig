@@ -28,75 +28,165 @@ test "Part 1" {
     try std.testing.expectEqual(@as(u64, 62), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
-    // try std.testing.expectEqual(@as(u64, 6), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 952408144115), try solve(.two, example1, std.testing.allocator));
 }
 
-const Vec2u = struct { x: u16, y: u16 };
-const Vec2i = struct { x: i2, y: i2 };
+const Vec2i = struct { x: i32, y: i32 };
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    const width = indexOf(u8, in, '\n').?;
-    const height = in.len / (width + 1);
-    _ = height;
+    var nodes = std.ArrayList(Vec2i).init(allocator);
+    defer nodes.deinit();
+    try nodes.append(.{ .x = 0, .y = 0 });
 
-    _ = part;
-    const initial_size = 510;
-    var map = try Array2D(bool).initWithDefault(allocator, initial_size, initial_size, false);
-    defer map.deinit(allocator);
+    var last_dir: u8 = 0;
+    var last_pos: Vec2i = nodes.getLast();
 
-    var curr_pos: Vec2u = .{ .x = initial_size / 2, .y = initial_size / 2 };
-    var start_dir: Vec2i = undefined;
+    const clock_wise = b: {
+        const first = in[0];
+        last_dir = in[lastIndexOf(u8, in[0..(in.len - 1)], '\n').? + 1];
+        // std.log.err("{c} {c}", .{ first, last_dir });
+        break :b switch (first) {
+            'L' => switch (last_dir) {
+                'U' => false,
+                'D' => true,
+                else => unreachable,
+            },
+            'R' => switch (last_dir) {
+                'U' => true,
+                'D' => false,
+                else => unreachable,
+            },
+            'U' => switch (last_dir) {
+                'R' => false,
+                'L' => true,
+                else => unreachable,
+            },
+            'D' => switch (last_dir) {
+                'R' => true,
+                'L' => false,
+                else => unreachable,
+            },
+            else => unreachable,
+        };
+    };
 
-    var y: usize = 0;
     var line_iter = tokenizeSca(u8, in, '\n');
-    while (line_iter.next()) |line| : (y += 1) {
-        const dir_text, var rest = splitOnceScalar(u8, line, ' ');
-        const dir = dir_text[0];
-        const dist_text, rest = splitOnceScalar(u8, rest, ' ');
-        var dist = try parseInt(u8, dist_text, 10);
-
-        if (y <= 1) {
-            switch (dir) {
-                'L' => start_dir.x = -1,
-                'R' => start_dir.x = 1,
-                'U' => start_dir.y = -1,
-                'D' => start_dir.y = 1,
+    while (line_iter.next()) |line| {
+        var dir: u8 = undefined;
+        var dist: u31 = undefined;
+        if (part == .one) {
+            const dir_text, var rest = splitOnceScalar(u8, line, ' ');
+            dir = dir_text[0];
+            const dist_text, rest = splitOnceScalar(u8, rest, ' ');
+            dist = try parseInt(u8, dist_text, 10) * 2;
+        } else if (part == .two) {
+            _, const hex = splitOnceScalar(u8, line, '#');
+            dir = switch (hex[5]) {
+                '0' => 'R',
+                '1' => 'D',
+                '2' => 'L',
+                '3' => 'U',
                 else => unreachable,
-            }
+            };
+            dist = try parseInt(u31, hex[0..5], 16) * 2;
         }
 
-        std.log.warn("{c} {}", .{ dir, dist });
-        while (dist > 0) : (dist -= 1) {
-            switch (dir) {
-                'L' => curr_pos.x -= 1,
-                'R' => curr_pos.x += 1,
-                'U' => curr_pos.y -= 1,
-                'D' => curr_pos.y += 1,
+        const offset: Vec2i = if (clock_wise)
+            switch (last_dir) {
+                'L' => switch (dir) {
+                    'U' => .{ .x = -1, .y = 1 },
+                    'D' => .{ .x = 1, .y = 1 },
+                    else => unreachable,
+                },
+                'R' => switch (dir) {
+                    'U' => .{ .x = -1, .y = -1 },
+                    'D' => .{ .x = 1, .y = -1 },
+                    else => unreachable,
+                },
+                'U' => switch (dir) {
+                    'L' => .{ .x = -1, .y = 1 },
+                    'R' => .{ .x = -1, .y = -1 },
+                    else => unreachable,
+                },
+                'D' => switch (dir) {
+                    'L' => .{ .x = 1, .y = 1 },
+                    'R' => .{ .x = 1, .y = -1 },
+                    else => unreachable,
+                },
                 else => unreachable,
             }
-            if (curr_pos.x >= map.width or curr_pos.y >= map.height) {
-                try map.resize(allocator, map.width * 2, map.height * 2);
-            }
-            map.set(curr_pos.x, curr_pos.y, true);
-        }
+        else switch (last_dir) {
+            'L' => switch (dir) {
+                'U' => .{ .x = 1, .y = -1 },
+                'D' => .{ .x = -1, .y = -1 },
+                else => unreachable,
+            },
+            'R' => switch (dir) {
+                'U' => .{ .x = 1, .y = 1 },
+                'D' => .{ .x = -1, .y = 1 },
+                else => unreachable,
+            },
+            'U' => switch (dir) {
+                'L' => .{ .x = 1, .y = -1 },
+                'R' => .{ .x = 1, .y = 1 },
+                else => unreachable,
+            },
+            'D' => switch (dir) {
+                'L' => .{ .x = -1, .y = -1 },
+                'R' => .{ .x = -1, .y = 1 },
+                else => unreachable,
+            },
+            else => unreachable,
+        };
+        _ = offset;
+        // std.log.warn("{s} {c} {} {}", .{ line, last_dir, offset, last_pos });
+        last_dir = dir;
+
+        // nodes.items[nodes.items.len - 1].x += offset.x;
+        // nodes.items[nodes.items.len - 1].y += offset.y;
+
+        last_pos = switch (dir) {
+            'L' => .{ .x = last_pos.x - dist, .y = last_pos.y },
+            'R' => .{ .x = last_pos.x + dist, .y = last_pos.y },
+            'U' => .{ .x = last_pos.x, .y = last_pos.y - dist },
+            'D' => .{ .x = last_pos.x, .y = last_pos.y + dist },
+            else => unreachable,
+        };
+        try nodes.append(last_pos);
+
+        var x: f32 = @as(f32, @floatFromInt(nodes.items[nodes.items.len - 2].x)) / 2.0;
+        _ = x;
+        var y: f32 = @as(f32, @floatFromInt(nodes.items[nodes.items.len - 2].y)) / 2.0;
+        _ = y;
+        // std.log.warn("{c} {} : {d} {d}", .{ dir, dist / 2, x, y });
     }
 
-    // Flood fill
-    var queue = std.ArrayList(Vec2u).init(allocator);
-    try queue.append(.{
-        .x = @intCast(@as(i16, initial_size / 2) + start_dir.x),
-        .y = @intCast(@as(i15, initial_size / 2) + start_dir.y),
-    }); // Start pos
-    while (queue.popOrNull()) |tile| {
-        map.set(tile.x, tile.y, true);
+    // Finish the loop and ensure its counter-clock-wise
+    nodes.items[nodes.items.len - 1] = nodes.items[0];
+    // std.log.warn("{any}", .{nodes});
 
-        if (tile.x != 0 and map.get(tile.x - 1, tile.y) != true) try queue.append(.{ .x = tile.x - 1, .y = tile.y });
-        if (tile.x != map.width - 1 and map.get(tile.x + 1, tile.y) != true) try queue.append(.{ .x = tile.x + 1, .y = tile.y });
-        if (tile.y != 0 and map.get(tile.x, tile.y - 1) != true) try queue.append(.{ .x = tile.x, .y = tile.y - 1 });
-        if (tile.y != map.height - 1 and map.get(tile.x, tile.y + 1) != true) try queue.append(.{ .x = tile.x, .y = tile.y + 1 });
+    // Shoelace Algorithm
+    const SumInt = i64;
+    var sum1: SumInt = 0;
+    var sum2: SumInt = 0;
+    for (0..(nodes.items.len - 1)) |i| {
+        sum1 += @as(SumInt, nodes.items[i].x) * @as(SumInt, nodes.items[i + 1].y);
+        sum2 += @as(SumInt, nodes.items[i].y) * @as(SumInt, nodes.items[i + 1].x);
     }
+    // Connect first and last
+    sum1 += nodes.getLast().x * nodes.items[0].y;
+    sum2 += nodes.items[0].y * nodes.getLast().x;
+    const area = @abs(sum1 - sum2) / 2;
 
-    return std.mem.count(bool, map.data, &.{true});
+    // Surcumrefence of the polygon
+    var sum3: u64 = 0;
+    for (0..(nodes.items.len - 1)) |i| {
+        sum3 += @abs(@as(SumInt, nodes.items[i + 1].x) - @as(SumInt, nodes.items[i].x));
+        sum3 += @abs(@as(SumInt, nodes.items[i + 1].y) - @as(SumInt, nodes.items[i].y));
+    }
+    // std.log.warn("{} {}", .{ area, sum3 });
+
+    return (area + sum3) / 4 + 1; // We inflated everything by 2 => / 4 area
 }
 
 // Useful stdlib functions
