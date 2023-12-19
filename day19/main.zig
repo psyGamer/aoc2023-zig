@@ -16,18 +16,20 @@ pub const std_options = struct {
 };
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    for (0..1000) |_| {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const allocator = arena.allocator();
 
-    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+        std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
+        std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+    }
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 19114), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
-    // try std.testing.expectEqual(@as(u64, 6), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 167409079868000), try solve(.two, example1, std.testing.allocator));
 }
 
 const ParseState = enum { workflow, parts };
@@ -45,10 +47,9 @@ const Workflow = struct {
     fallthrough: []const u8,
 };
 const MachinePart = struct { x: u32, m: u32, a: u32, s: u32 };
+const PartRange = struct { x0: u32, x1: u32, m0: u32, m1: u32, a0: u32, a1: u32, s0: u32, s1: u32 };
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    _ = part;
-
     var state: ParseState = .workflow;
 
     var workflows = std.StringHashMap(Workflow).init(allocator);
@@ -65,6 +66,7 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     var line_iter = splitSca(u8, in, '\n');
     while (line_iter.next()) |line| {
         if (line.len == 0) {
+            if (part == .two) break;
             state = .parts;
             continue;
         }
@@ -100,7 +102,6 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
 
             try workflows.put(name, workflow);
         } else if (state == .parts) {
-            std.log.warn("{s}", .{line[1..(line.len - 1)]});
             // const x, const m, const a, const s = try scan("x={u32},m={u32},a={u32},s={u32}", line[1..(line.len - 1)]);
             // try parts.append(.{ .x = x, .m = m, .a = a, .s = s });
 
@@ -114,37 +115,132 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         }
     }
 
-    var result: u32 = 0;
+    if (part == .one) {
+        var result: u32 = 0;
 
-    for (parts.items) |p| {
-        std.log.err("cur {}", .{p});
-        var curr_name: []const u8 = "in";
-        var curr: Workflow = undefined;
-        outer: while (!std.mem.eql(u8, curr_name, "A") and !std.mem.eql(u8, curr_name, "R")) {
-            std.log.warn("curr {s}", .{curr_name});
-            curr = workflows.get(curr_name).?;
-            for (curr.rules.items) |r| {
-                const a = switch (r.variable) {
-                    .x => p.x,
-                    .m => p.m,
-                    .a => p.a,
-                    .s => p.s,
-                };
-                if ((r.comparer == .gt and a > r.other) or (r.comparer == .lt and a < r.other)) {
-                    curr_name = r.target;
-                    continue :outer;
+        for (parts.items) |p| {
+            var curr_name: []const u8 = "in";
+            var curr: Workflow = undefined;
+            outer: while (!std.mem.eql(u8, curr_name, "A") and !std.mem.eql(u8, curr_name, "R")) {
+                curr = workflows.get(curr_name).?;
+                for (curr.rules.items) |r| {
+                    const a = switch (r.variable) {
+                        .x => p.x,
+                        .m => p.m,
+                        .a => p.a,
+                        .s => p.s,
+                    };
+                    if ((r.comparer == .gt and a > r.other) or (r.comparer == .lt and a < r.other)) {
+                        curr_name = r.target;
+                        continue :outer;
+                    }
+                }
+
+                curr_name = curr.fallthrough;
+            }
+
+            if (curr_name[0] == 'A') {
+                result += p.x + p.m + p.a + p.s;
+            }
+        }
+
+        return result;
+    } else if (part == .two) {
+        var range_map = std.StringHashMap(std.ArrayList(PartRange)).init(allocator);
+        defer {
+            var iter = range_map.valueIterator();
+            while (iter.next()) |r| {
+                r.deinit();
+            }
+            range_map.deinit();
+        }
+        var workflows_left = std.ArrayList([]const u8).init(allocator);
+        defer workflows_left.deinit();
+
+        var key_iter = workflows.keyIterator();
+        while (key_iter.next()) |key| {
+            try range_map.put(key.*, std.ArrayList(PartRange).init(allocator));
+        }
+
+        try range_map.put("A", std.ArrayList(PartRange).init(allocator));
+        try range_map.put("R", std.ArrayList(PartRange).init(allocator));
+
+        try workflows_left.append("in");
+        var start_ranges = range_map.getPtr("in").?;
+        try start_ranges.append(.{ .x0 = 1, .x1 = 4000, .m0 = 1, .m1 = 4000, .a0 = 1, .a1 = 4000, .s0 = 1, .s1 = 4000 });
+
+        while (workflows_left.popOrNull()) |workflow_name| {
+            const workflow = workflows.get(workflow_name).?;
+            var ranges = range_map.get(workflow_name).?;
+
+            for (workflow.rules.items) |r| {
+                if (!std.mem.eql(u8, r.target, "A") and !std.mem.eql(u8, r.target, "R")) {
+                    try workflows_left.append(r.target);
+                }
+                var new_ranges = range_map.getPtr(r.target).?;
+
+                for (ranges.items) |*range| {
+                    switch (r.variable) {
+                        .x => switch (r.comparer) {
+                            .gt => {
+                                try new_ranges.append(.{ .x0 = r.other + 1, .x1 = range.x1, .m0 = range.m0, .m1 = range.m1, .a0 = range.a0, .a1 = range.a1, .s0 = range.s0, .s1 = range.s1 });
+                                range.x1 = r.other;
+                            },
+                            .lt => {
+                                try new_ranges.append(.{ .x0 = range.x0, .x1 = r.other - 1, .m0 = range.m0, .m1 = range.m1, .a0 = range.a0, .a1 = range.a1, .s0 = range.s0, .s1 = range.s1 });
+                                range.x0 = r.other;
+                            },
+                        },
+                        .m => switch (r.comparer) {
+                            .gt => {
+                                try new_ranges.append(.{ .x0 = range.x0, .x1 = range.x1, .m0 = r.other + 1, .m1 = range.m1, .a0 = range.a0, .a1 = range.a1, .s0 = range.s0, .s1 = range.s1 });
+                                range.m1 = r.other;
+                            },
+                            .lt => {
+                                try new_ranges.append(.{ .x0 = range.x0, .x1 = range.x1, .m0 = range.m0, .m1 = r.other - 1, .a0 = range.a0, .a1 = range.a1, .s0 = range.s0, .s1 = range.s1 });
+                                range.m0 = r.other;
+                            },
+                        },
+                        .a => switch (r.comparer) {
+                            .gt => {
+                                try new_ranges.append(.{ .x0 = range.x0, .x1 = range.x1, .m0 = range.m0, .m1 = range.m1, .a0 = r.other + 1, .a1 = range.a1, .s0 = range.s0, .s1 = range.s1 });
+                                range.a1 = r.other;
+                            },
+                            .lt => {
+                                try new_ranges.append(.{ .x0 = range.x0, .x1 = range.x1, .m0 = range.m0, .m1 = range.m1, .a0 = range.a0, .a1 = r.other - 1, .s0 = range.s0, .s1 = range.s1 });
+                                range.a0 = r.other;
+                            },
+                        },
+                        .s => switch (r.comparer) {
+                            .gt => {
+                                try new_ranges.append(.{ .x0 = range.x0, .x1 = range.x1, .m0 = range.m0, .m1 = range.m1, .a0 = range.a0, .a1 = range.a1, .s0 = r.other + 1, .s1 = range.s1 });
+                                range.s1 = r.other;
+                            },
+                            .lt => {
+                                try new_ranges.append(.{ .x0 = range.x0, .x1 = range.x1, .m0 = range.m0, .m1 = range.m1, .a0 = range.a0, .a1 = range.a1, .s0 = range.s0, .s1 = r.other - 1 });
+                                range.s0 = r.other;
+                            },
+                        },
+                    }
                 }
             }
 
-            curr_name = curr.fallthrough;
+            if (!std.mem.eql(u8, workflow.fallthrough, "A") and !std.mem.eql(u8, workflow.fallthrough, "R")) {
+                try workflows_left.append(workflow.fallthrough);
+            }
+            var new_ranges = range_map.getPtr(workflow.fallthrough).?;
+            try new_ranges.appendSlice(ranges.items);
+            ranges.clearRetainingCapacity();
         }
 
-        if (curr_name[0] == 'A') {
-            result += p.x + p.m + p.a + p.s;
+        const accepted = range_map.get("A").?;
+
+        var result: u64 = 0;
+        for (accepted.items) |a| {
+            result += @as(u64, (a.x1 - a.x0 + 1)) * @as(u64, (a.m1 - a.m0 + 1)) * @as(u64, (a.a1 - a.a0 + 1)) * @as(u64, (a.s1 - a.s0 + 1));
         }
+        return result;
     }
-
-    return result;
 }
 
 // Useful stdlib functions
