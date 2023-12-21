@@ -22,12 +22,8 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // std.log.info("Result (Part 1): {}", .{try solve(.one, 64, input, allocator)});
+    std.log.info("Result (Part 1): {}", .{try solve(.one, 64, input, allocator)});
     std.log.info("Result (Part 2): {}", .{try solve(.two, 26501365, input, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, 327, input, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, 589, input, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, 851, input, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, 1113, input, allocator)});
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 16), try solve(.one, 6, example1, std.testing.allocator));
@@ -77,59 +73,17 @@ pub fn solve(comptime part: Part, comptime max_distance: comptime_int, in: []con
         defer wrapped_queue.deinit();
         try queue.append(start);
 
-        std.log.warn("Star {}", .{start});
-
         while (queue.popOrNull()) |tile| {
-            const curr_tile = map.get(tile.x, tile.y);
-            std.log.warn("curr {} (prev {})", .{ tile, curr_tile });
-            if (curr_tile <= tile.distance) continue;
+            if (map.get(tile.x, tile.y) <= tile.distance) continue;
             map.set(tile.x, tile.y, tile.distance);
             if (tile.distance == max_distance + 1) {
                 continue;
             }
 
-            if (part == .one) {
-                if (tile.x != 0) try queue.append(.{ .x = @intCast(tile.x - 1), .y = @intCast(tile.y), .distance = tile.distance + 1 });
-                if (tile.y != 0) try queue.append(.{ .x = @intCast(tile.x), .y = @intCast(tile.y - 1), .distance = tile.distance + 1 });
-                if (tile.x != width - 1) try queue.append(.{ .x = @intCast(tile.x + 1), .y = @intCast(tile.y), .distance = tile.distance + 1 });
-                if (tile.y != height - 1) try queue.append(.{ .x = @intCast(tile.x), .y = @intCast(tile.y + 1), .distance = tile.distance + 1 });
-            }
-            // } else if (part == .two) {
-            //     if (tile.x == 0) {
-            //         try wrapped_queue.append(.{ .x = @intCast(width - 1), .y = @intCast(tile.y), .distance = tile.distance + 1 });
-            //     } else {
-            //         try queue.append(.{ .x = tile.x - 1, .y = @intCast(tile.y), .distance = tile.distance + 1 });
-            //     }
-            //     if (tile.y == 0) {
-            //         try wrapped_queue.append(.{ .x = @intCast(height - 1), .y = @intCast(tile.y), .distance = tile.distance + 1 });
-            //     } else {
-            //         try queue.append(.{ .x = @intCast(tile.x), .y = @intCast(tile.y - 1), .distance = tile.distance + 1 });
-            //     }
-            //     if (tile.x == width - 1) {
-            //         try wrapped_queue.append(.{ .x = 0, .y = @intCast(tile.y), .distance = tile.distance + 1 });
-            //     } else {
-            //         try queue.append(.{ .x = @intCast((tile.x + 1)), .y = @intCast(tile.y), .distance = tile.distance + 1 });
-            //     }
-            //     if (tile.y == height - 1) {
-            //         try wrapped_queue.append(.{ .x = @intCast(tile.x), .y = 0, .distance = tile.distance + 1 });
-            //     } else {
-            //         try queue.append(.{ .x = @intCast(tile.x), .y = @intCast((tile.y + 1)), .distance = tile.distance + 1 });
-            //     }
-            // }
-        }
-
-        std.debug.print("\n", .{});
-        for (0..map.height) |ny| {
-            for (0..map.width) |nx| {
-                if (map.get(nx, ny) == 255) {
-                    std.debug.print("    ", .{});
-                } else if (map.get(nx, ny) == 0) {
-                    std.debug.print("### ", .{});
-                } else {
-                    std.debug.print("{d:0>3} ", .{map.get(nx, ny)});
-                }
-            }
-            std.debug.print("\n", .{});
+            if (tile.x != 0) try queue.append(.{ .x = @intCast(tile.x - 1), .y = @intCast(tile.y), .distance = tile.distance + 1 });
+            if (tile.y != 0) try queue.append(.{ .x = @intCast(tile.x), .y = @intCast(tile.y - 1), .distance = tile.distance + 1 });
+            if (tile.x != width - 1) try queue.append(.{ .x = @intCast(tile.x + 1), .y = @intCast(tile.y), .distance = tile.distance + 1 });
+            if (tile.y != height - 1) try queue.append(.{ .x = @intCast(tile.x), .y = @intCast(tile.y + 1), .distance = tile.distance + 1 });
         }
 
         var result: u32 = 0;
@@ -142,56 +96,6 @@ pub fn solve(comptime part: Part, comptime max_distance: comptime_int, in: []con
         // This trick only works with the real input and not the examples..
         std.debug.assert(width == 131);
         std.debug.assert(height == 131);
-
-        // var top_rocks: u32 = 0;
-        // var bottom_rocks: u32 = 0;
-        // var left_rocks: u32 = 0;
-        // var right_rocks: u32 = 0;
-
-        // var tl_diag1: u32 = 0;
-        // var tl_diag2: u32 = 0;
-
-        // var y: usize = 0;
-        // var line_iter = tokenizeSca(u8, in, '\n');
-        // while (line_iter.next()) |line| : (y += 1) {
-        //     for (line, 0..) |char, x| {
-        //         switch (char) {
-        //             '#' => {
-        //                 if ((x + y) % 2 == 0) continue;
-
-        //                 if (x + y >= 65 and x -| y <= 65) {
-        //                     top_rocks += 1;
-        //                 }
-        //                 if (x + (height - y - 1) >= 65 and x -| (height - y - 1) <= 65) {
-        //                     bottom_rocks += 1;
-        //                 }
-        //                 if (x + y >= 65 and y -| x <= 65) {
-        //                     left_rocks += 1;
-        //                 }
-        //                 if ((width - x - 1) + y >= 65 and y -| (width - x - 1) <= 65) {
-        //                     right_rocks += 1;
-        //                 }
-
-        //                 if (x + y >= 65) {
-        //                     tl_diag1 += 1;
-        //                 }
-        //                 if (x -| (height - y - 1) <= 65) {
-        //                     tl_diag2 += 1;
-        //                 }
-        //             },
-        //             else => continue,
-        //         }
-        //     }
-        // }
-        // std.log.warn("TOP {}", .{top_rocks});
-        // std.log.warn("BOTTOM {}", .{bottom_rocks});
-        // std.log.warn("LEFT {}", .{left_rocks});
-        // std.log.warn("RIGHT {}", .{right_rocks});
-
-        // std.log.warn("TOP LEFT DIAG {} {}", .{ tl_diag1, tl_diag2 });
-
-        var map = try Array2D(u8).initWithDefault(allocator, width, height, 0);
-        defer map.deinit(allocator);
 
         var tl: u32 = 0;
         var tr: u32 = 0;
@@ -206,65 +110,32 @@ pub fn solve(comptime part: Part, comptime max_distance: comptime_int, in: []con
                 switch (char) {
                     '#' => {
                         if ((x + y) % 2 == 0) continue;
-                        map.set(x, y, 9);
                         total += 1;
 
-                        if (x + y <= 65) {
-                            // std.log.err("TL {} {}", .{ x, y });
-                            map.set(x, y, 1);
-                            tl += 1;
-                        }
-
-                        if (x -| y >= 65) {
-                            // std.log.err("TR {} {}", .{ x, y });
-                            map.set(x, y, 2);
-                            tr += 1;
-                        }
-                        if (y -| x >= 65) {
-                            // std.log.err("BL {} {}", .{ x, y });
-                            map.set(x, y, 3);
-                            bl += 1;
-                        }
-                        if (x + y >= 65 * 3) {
-                            // std.log.err("BR {} {}", .{ x, y });
-                            map.set(x, y, 4);
-                            br += 1;
-                        }
+                        if (x + y <= 65) tl += 1;
+                        if (x -| y >= 65) tr += 1;
+                        if (y -| x >= 65) bl += 1;
+                        if (x + y >= 65 * 3) br += 1;
                     },
                     else => continue,
                 }
             }
         }
 
-        // std.log.warn("\n{}", .{map});
-
-        // std.log.warn("TOP {}", .{total - tl - tr});
-        // std.log.warn("BOTTOM {}", .{total - bl - br});
-        // std.log.warn("LEFT {}", .{total - tl - bl});
-        // std.log.warn("RIGHT {}", .{total - tr - br});
-        std.log.warn("TL {} TR {} BL {} BR {} TOTAL {}", .{ tl, tr, bl, br, total });
-
         var max_possible: u128 = 0;
         var i: u128 = max_distance % 2;
         while (i <= max_distance) : (i += 2) {
-            // max_possible += (i + 1) * (i + 1);
             max_possible += @max(1, i * 4);
         }
 
-        std.log.warn("{}", .{max_possible});
-
         // Top
         max_possible -= (total - tl - tr);
-        std.log.warn("{}", .{max_possible});
         // Bottom
         max_possible -= (total - bl - br);
-        std.log.warn("{}", .{max_possible});
         // Left
         max_possible -= (total - tl - bl);
-        std.log.warn("{}", .{max_possible});
         // Right
         max_possible -= (total - tr - br);
-        std.log.warn("{}", .{max_possible});
 
         const tile_radius = (max_distance - 65) / 131;
         const diag_size = @divTrunc(tile_radius, 2);
@@ -272,19 +143,15 @@ pub fn solve(comptime part: Part, comptime max_distance: comptime_int, in: []con
         // Top left
         max_possible -= (diag_size + 1) * br;
         max_possible -= (diag_size) * (total - tl);
-        std.log.warn("{}", .{max_possible});
         // Top right
         max_possible -= (diag_size + 1) * bl;
         max_possible -= (diag_size) * (total - tr);
-        std.log.warn("{}", .{max_possible});
         // Bottom left
         max_possible -= (diag_size + 1) * tr;
         max_possible -= (diag_size) * (total - bl);
-        std.log.warn("{}", .{max_possible});
         // Bottom right
         max_possible -= (diag_size + 1) * tl;
         max_possible -= (diag_size) * (total - br);
-        std.log.warn("{} {} {}", .{ max_possible, tile_radius, diag_size });
 
         var inner_count: u128 = 1;
         // Inner
@@ -297,8 +164,6 @@ pub fn solve(comptime part: Part, comptime max_distance: comptime_int, in: []con
         max_possible += 161 * (diag_size * diag_size) - ((diag_size - 1) * (diag_size - 1));
 
         max_possible -= inner_count * total;
-
-        std.log.warn("{} {}", .{ max_possible, inner_count });
 
         return @intCast(max_possible);
     }
