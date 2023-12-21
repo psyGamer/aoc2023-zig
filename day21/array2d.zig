@@ -53,7 +53,11 @@ pub fn Array2D(comptime T: type) type {
             _ = options;
             for (0..value.height) |y| {
                 for (0..value.width) |x| {
-                    try writer.print("{" ++ fmt ++ "} ", .{value.get(x, y)});
+                    if (value.get(x, y) == 0) {
+                        try writer.print(" ", .{});
+                    } else {
+                        try writer.print("{" ++ fmt ++ "}", .{value.get(x, y)});
+                    }
                 }
                 try writer.writeByte('\n');
             }
