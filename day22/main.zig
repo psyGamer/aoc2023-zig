@@ -9,6 +9,7 @@ pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
+const Array2D = @import("array2d.zig").Array2D;
 const Array3D = @import("array3d.zig").Array3D;
 const Part = enum { one, two };
 
@@ -42,6 +43,14 @@ const Brick = struct {
 
     supports: std.AutoArrayHashMap(*Brick, void),
     supported_by: std.AutoArrayHashMap(*Brick, void),
+
+    pub fn lessThan(_: void, lhs: Brick, rhs: Brick) bool {
+        return lhs.a.z < rhs.a.z;
+    }
+
+    pub fn format(value: Brick, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("{},{},{}~{},{},{}", .{ value.a.x, value.a.y, value.a.z, value.b.x, value.b.y, value.b.z });
+    }
 };
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
@@ -56,7 +65,8 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
 
     var max_width: usize = 0;
     var max_height: usize = 0;
-    var max_depth: usize = 0;
+    var min_width: usize = std.math.maxInt(usize);
+    var min_height: usize = std.math.maxInt(usize);
 
     var line_iter = tokenizeSca(u8, in, '\n');
     while (line_iter.next()) |line| {
@@ -70,7 +80,8 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         };
         max_width = @max(max_width, a.x + 1);
         max_height = @max(max_height, a.y + 1);
-        max_depth = @max(max_depth, a.z + 1);
+        min_width = @min(min_width, a.x);
+        min_height = @min(min_height, a.y);
 
         comma_iter = splitSca(u8, tilde_iter.next().?, ',');
         const b: Vec3u = .{
@@ -80,106 +91,100 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         };
         max_width = @max(max_width, b.x + 1);
         max_height = @max(max_height, b.y + 1);
-        max_depth = @max(max_depth, b.z + 1);
+        min_width = @min(min_width, b.x);
+        min_height = @min(min_height, b.y);
 
         try bricks.append(.{ .a = a, .b = b, .supports = std.AutoArrayHashMap(*Brick, void).init(allocator), .supported_by = std.AutoArrayHashMap(*Brick, void).init(allocator) });
     }
 
-    var map = try Array3D(?*Brick).initWithDefault(allocator, max_width, max_height, max_depth, null);
-    defer map.deinit(allocator);
+    // Sort bricks from bottom to top
+    sort(Brick, bricks.items, {}, Brick.lessThan);
+
+    var height_map = try Array2D(?*Brick).initWithDefault(allocator, max_width - min_width, max_height - min_height, null);
+    defer height_map.deinit(allocator);
+
+    var supported_by = std.AutoArrayHashMap(*Brick, void).init(allocator);
+    defer supported_by.deinit();
 
     for (bricks.items) |*b| {
-        const dir: Vec3i = .{
-            .x = if (b.a.x == b.b.x) 0 else if (b.a.x < b.b.x) 1 else -1,
-            .y = if (b.a.y == b.b.y) 0 else if (b.a.y < b.b.y) 1 else -1,
-            .z = if (b.a.z == b.b.z) 0 else if (b.a.z < b.b.z) 1 else -1,
-        };
-        var curr: Vec3i = .{
-            .x = @intCast(b.a.x),
-            .y = @intCast(b.a.y),
-            .z = @intCast(b.a.z),
-        };
+        // Slight assumptions made about the input
+        std.debug.assert(b.a.x <= b.b.x);
+        std.debug.assert(b.a.y <= b.b.y);
+        std.debug.assert(b.a.z <= b.b.z);
 
-        while (true) : ({
-            curr.x += dir.x;
-            curr.y += dir.y;
-            curr.z += dir.z;
-        }) {
-            map.set(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z), b);
-            if (curr.x == b.b.x and curr.y == b.b.y and curr.z == b.b.z) break;
-        }
-    }
+        var max_ground_height: u16 = 0;
+        supported_by.clearRetainingCapacity();
 
-    while (true) {
-        var all_supported = true;
-        for (bricks.items) |*b| {
-            b.supported_by.clearRetainingCapacity();
-
-            const dir: Vec3i = .{
-                .x = if (b.a.x == b.b.x) 0 else if (b.a.x < b.b.x) 1 else -1,
-                .y = if (b.a.y == b.b.y) 0 else if (b.a.y < b.b.y) 1 else -1,
-                .z = if (b.a.z == b.b.z) 0 else if (b.a.z < b.b.z) 1 else -1,
-            };
-
-            if (dir.z != 0) {
-                if (map.get(b.a.x, b.a.y, b.a.z - 1)) |s| {
-                    try b.supported_by.put(s, {});
-                }
-            } else {
-                var curr: Vec3i = .{
-                    .x = @intCast(b.a.x),
-                    .y = @intCast(b.a.y),
-                    .z = @intCast(b.a.z),
-                };
-
-                while (true) : ({
-                    curr.x += dir.x;
-                    curr.y += dir.y;
-                }) {
-                    if (map.get(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z - 1))) |s| {
-                        try b.supported_by.put(s, {});
+        if (b.a.x != b.b.x) { // +X
+            for ((b.a.x - min_width)..(b.b.x - min_width + 1)) |x| {
+                if (height_map.get(x, b.a.y - min_height)) |support| {
+                    if (support.b.z > max_ground_height) {
+                        max_ground_height = support.b.z;
+                        supported_by.clearRetainingCapacity();
+                        try supported_by.put(support, {});
+                    } else if (support.b.z == max_ground_height) {
+                        try supported_by.put(support, {});
                     }
-                    if (curr.x == b.b.x and curr.y == b.b.y) break;
+                    continue;
+                }
+                max_ground_height = @max(max_ground_height, 0);
+            }
+        } else if (b.a.y != b.b.y) { // +Y
+            for ((b.a.y - min_height)..(b.b.y - min_height + 1)) |y| {
+                if (height_map.get(b.a.x - min_width, y)) |support| {
+                    if (support.b.z > max_ground_height) {
+                        max_ground_height = support.b.z;
+                        supported_by.clearRetainingCapacity();
+                        try supported_by.put(support, {});
+                    } else if (support.b.z == max_ground_height) {
+                        try supported_by.put(support, {});
+                    }
+                    continue;
+                }
+                max_ground_height = @max(max_ground_height, 0);
+            }
+        } else { // +Z / Single block
+            if (height_map.get(b.a.x - min_width, b.a.y - min_height)) |support| {
+                if (support.b.z > max_ground_height) {
+                    max_ground_height = support.b.z;
+                    supported_by.clearRetainingCapacity();
+                    try supported_by.put(support, {});
+                } else if (support.b.z == max_ground_height) {
+                    try supported_by.put(support, {});
                 }
             }
-
-            if (b.a.z == 1 or b.supported_by.keys().len != 0) {
-                // On ground / supported
-                continue;
-            }
-
-            all_supported = false;
-
-            var curr: Vec3i = .{
-                .x = @intCast(b.a.x),
-                .y = @intCast(b.a.y),
-                .z = @intCast(b.a.z),
-            };
-
-            while (true) : ({
-                curr.x += dir.x;
-                curr.y += dir.y;
-                curr.z += dir.z;
-            }) {
-                map.set(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z), null);
-                map.set(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z - 1), b);
-                if (curr.x == b.b.x and curr.y == b.b.y and curr.z == b.b.z) break;
-            }
-
-            b.a.z -= 1;
-            b.b.z -= 1;
         }
-        if (all_supported) break;
+
+        max_ground_height += 1; // Place on top of ground, not inside
+
+        b.b.z -= b.a.z - max_ground_height;
+        b.a.z = max_ground_height;
+        b.supported_by = try supported_by.clone();
+
+        // Update height map
+        if (b.a.x != b.b.x) { // +X
+            for ((b.a.x - min_width)..(b.b.x - min_width + 1)) |x| {
+                height_map.set(x, b.a.y - min_height, b);
+            }
+        } else if (b.a.y != b.b.y) { // +Y
+            for ((b.a.y - min_height)..(b.b.y - min_height + 1)) |y| {
+                height_map.set(b.a.x - min_width, y, b);
+            }
+        } else { // +Z / Single block
+            height_map.set(b.a.x - min_width, b.a.y - min_height, b);
+        }
     }
 
+    // Generate supports set
     for (bricks.items) |*b| {
         for (b.supported_by.keys()) |s| {
             try s.supports.put(b, {});
         }
     }
 
+    var result: u32 = 0;
+
     if (part == .one) {
-        var result: u32 = 0;
         for (bricks.items) |b| {
             var all_ok = true;
             for (b.supports.keys()) |s| {
@@ -189,10 +194,7 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
             }
             if (all_ok) result += 1;
         }
-        return result;
     } else if (part == .two) {
-        var result: u32 = 0;
-
         var seen = std.AutoHashMap(*Brick, void).init(allocator);
         defer seen.deinit();
 
@@ -224,9 +226,9 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
 
             result += seen.count() - 1;
         }
-
-        return result;
     }
+
+    return result;
 }
 
 // Useful stdlib functions
