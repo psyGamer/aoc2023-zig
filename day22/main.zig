@@ -35,11 +35,24 @@ test "Part 2" {
 
 const Vec3u = struct { x: u16, y: u16, z: u16 };
 const Vec3i = struct { x: i16, y: i16, z: i16 };
-const Brick = struct { a: Vec3u, b: Vec3u };
+
+const Brick = struct {
+    a: Vec3u,
+    b: Vec3u,
+
+    supports: std.AutoArrayHashMap(*Brick, void),
+    supported_by: std.AutoArrayHashMap(*Brick, void),
+};
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     var bricks = std.ArrayList(Brick).init(allocator);
-    defer bricks.deinit();
+    defer {
+        for (bricks.items) |*b| {
+            b.supports.deinit();
+            b.supported_by.deinit();
+        }
+        bricks.deinit();
+    }
 
     var max_width: usize = 0;
     var max_height: usize = 0;
@@ -69,7 +82,7 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         max_height = @max(max_height, b.y + 1);
         max_depth = @max(max_depth, b.z + 1);
 
-        try bricks.append(.{ .a = a, .b = b });
+        try bricks.append(.{ .a = a, .b = b, .supports = std.AutoArrayHashMap(*Brick, void).init(allocator), .supported_by = std.AutoArrayHashMap(*Brick, void).init(allocator) });
     }
 
     var map = try Array3D(?*Brick).initWithDefault(allocator, max_width, max_height, max_depth, null);
@@ -97,23 +110,10 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         }
     }
 
-    var supported_by_map = std.AutoArrayHashMap(*Brick, std.AutoArrayHashMap(*Brick, void)).init(allocator);
-    defer {
-        for (supported_by_map.values()) |*v| {
-            v.deinit();
-        }
-        supported_by_map.deinit();
-    }
-
     while (true) {
         var all_supported = true;
         for (bricks.items) |*b| {
-            const gop = try supported_by_map.getOrPut(b);
-            if (!gop.found_existing) {
-                gop.value_ptr.* = std.AutoArrayHashMap(*Brick, void).init(allocator);
-            }
-            var supported_by = gop.value_ptr;
-            supported_by.clearRetainingCapacity();
+            b.supported_by.clearRetainingCapacity();
 
             const dir: Vec3i = .{
                 .x = if (b.a.x == b.b.x) 0 else if (b.a.x < b.b.x) 1 else -1,
@@ -123,7 +123,7 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
 
             if (dir.z != 0) {
                 if (map.get(b.a.x, b.a.y, b.a.z - 1)) |s| {
-                    try supported_by.put(s, {});
+                    try b.supported_by.put(s, {});
                 }
             } else {
                 var curr: Vec3i = .{
@@ -137,13 +137,13 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
                     curr.y += dir.y;
                 }) {
                     if (map.get(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z - 1))) |s| {
-                        try supported_by.put(s, {});
+                        try b.supported_by.put(s, {});
                     }
                     if (curr.x == b.b.x and curr.y == b.b.y) break;
                 }
             }
 
-            if (b.a.z == 1 or supported_by.keys().len != 0) {
+            if (b.a.z == 1 or b.supported_by.keys().len != 0) {
                 // On ground / supported
                 continue;
             }
@@ -172,67 +172,57 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         if (all_supported) break;
     }
 
-    var supports = std.AutoArrayHashMap(*Brick, std.ArrayList(*Brick)).init(allocator);
-    defer {
-        for (supports.values()) |*v| {
-            v.deinit();
-        }
-        supports.deinit();
-    }
-
     for (bricks.items) |*b| {
-        for (supported_by_map.get(b).?.keys()) |s| {
-            const gop2 = try supports.getOrPut(s);
-            if (!gop2.found_existing) {
-                gop2.value_ptr.* = std.ArrayList(*Brick).init(allocator);
-            }
-            try gop2.value_ptr.append(b);
+        for (b.supported_by.keys()) |s| {
+            try s.supports.put(b, {});
         }
     }
 
     if (part == .one) {
-        var result: u32 = @intCast(bricks.items.len - supports.keys().len); // Account for bricks which don't support anything
-        for (supports.values()) |v| {
+        var result: u32 = 0;
+        for (bricks.items) |b| {
             var all_ok = true;
-            for (v.items) |s| {
-                if (supported_by_map.get(s).?.keys().len <= 1) {
+            for (b.supports.keys()) |s| {
+                if (s.supported_by.keys().len <= 1) {
                     all_ok = false;
                 }
             }
-
             if (all_ok) result += 1;
         }
         return result;
     } else if (part == .two) {
         var result: u32 = 0;
-        for (bricks.items) |*brick| {
-            var support_map = std.AutoArrayHashMap(*Brick, std.AutoArrayHashMap(*Brick, void)).init(allocator);
-            defer {
-                for (support_map.values()) |*v| {
-                    v.deinit();
-                }
-                support_map.deinit();
-            }
-            for (supported_by_map.keys(), supported_by_map.values()) |k, v| {
-                try support_map.put(k, try v.clone());
-            }
 
-            var queue = std.ArrayList(*Brick).init(allocator);
-            defer queue.deinit();
+        var seen = std.AutoHashMap(*Brick, void).init(allocator);
+        defer seen.deinit();
+
+        var queue = std.ArrayList(*Brick).init(allocator);
+        defer queue.deinit();
+
+        for (bricks.items) |*brick| {
+            // Do a best-first-seach
+            seen.clearRetainingCapacity();
+            queue.clearRetainingCapacity();
 
             try queue.append(brick);
 
             while (queue.popOrNull()) |b| {
-                if (supports.get(b)) |s| {
-                    for (s.items) |sn| {
-                        var supported_by = support_map.getPtr(sn).?;
-                        _ = supported_by.swapRemove(b);
-                        if (supported_by.keys().len != 0) continue;
-                        try queue.append(sn);
-                        result += 1;
+                try seen.put(b, {});
+                for (b.supports.keys()) |child| {
+                    var all_seen = true;
+                    for (child.supported_by.keys()) |parent| {
+                        if (!seen.contains(parent)) {
+                            all_seen = false;
+                            break;
+                        }
+                    }
+                    if (all_seen) {
+                        try queue.append(child);
                     }
                 }
             }
+
+            result += seen.count() - 1;
         }
 
         return result;
