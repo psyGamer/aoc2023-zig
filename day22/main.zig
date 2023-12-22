@@ -17,13 +17,14 @@ pub const std_options = struct {
 };
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    for (0..100) |_| {
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const allocator = arena.allocator();
 
-    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
-    std.log.info("Result (Part 1): {}", .{try solve(.one, example2, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+        std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
+        std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+    }
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 5), try solve(.one, example1, std.testing.allocator));
@@ -69,8 +70,6 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         max_depth = @max(max_depth, b.z + 1);
 
         try bricks.append(.{ .a = a, .b = b });
-
-        // std.log.warn("{} {}", .{ a, b });
     }
 
     var map = try Array3D(?*Brick).initWithDefault(allocator, max_width, max_height, max_depth, null);
@@ -93,13 +92,18 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
             curr.y += dir.y;
             curr.z += dir.z;
         }) {
-            // std.log.err("Setting {} at {}", .{ b, curr });
             map.set(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z), b);
             if (curr.x == b.b.x and curr.y == b.b.y and curr.z == b.b.z) break;
         }
     }
 
     var supported_by_map = std.AutoArrayHashMap(*Brick, std.AutoArrayHashMap(*Brick, void)).init(allocator);
+    defer {
+        for (supported_by_map.values()) |*v| {
+            v.deinit();
+        }
+        supported_by_map.deinit();
+    }
 
     while (true) {
         var all_supported = true;
@@ -116,11 +120,9 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
                 .y = if (b.a.y == b.b.y) 0 else if (b.a.y < b.b.y) 1 else -1,
                 .z = if (b.a.z == b.b.z) 0 else if (b.a.z < b.b.z) 1 else -1,
             };
-            // std.log.warn("dir {}: {}", .{ b.*, dir });
 
             if (dir.z != 0) {
                 if (map.get(b.a.x, b.a.y, b.a.z - 1)) |s| {
-                    // std.log.err("{} found support Y {}", .{ b.*, s });
                     try supported_by.put(s, {});
                 }
             } else {
@@ -135,54 +137,50 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
                     curr.y += dir.y;
                 }) {
                     if (map.get(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z - 1))) |s| {
-                        // std.log.err("{} found support {} at {} {} {}", .{ b.*, s, curr.x, curr.y, curr.z - 1 });
                         try supported_by.put(s, {});
                     }
                     if (curr.x == b.b.x and curr.y == b.b.y) break;
                 }
             }
 
-            if (b.a.z == 1) {
-                // std.log.err("On groud {}", .{b.*});
-            } else if (supported_by.keys().len == 0) {
-                // std.log.err("Not supported {}", .{b.*});
-                all_supported = false;
-
-                var curr: Vec3i = .{
-                    .x = @intCast(b.a.x),
-                    .y = @intCast(b.a.y),
-                    .z = @intCast(b.a.z),
-                };
-
-                while (true) : ({
-                    curr.x += dir.x;
-                    curr.y += dir.y;
-                    curr.z += dir.z;
-                }) {
-                    // std.log.err("Moving from {} {} {} to {} {} {}", .{ curr.x, curr.y, curr.z, curr.x, curr.y, curr.z - 1 });
-
-                    map.set(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z), null);
-                    map.set(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z - 1), b);
-                    if (curr.x == b.b.x and curr.y == b.b.y and curr.z == b.b.z) break;
-                }
-
-                b.a.z -= 1;
-                b.b.z -= 1;
-            } else {
-                // std.log.err("Supported {}", .{b.*});
+            if (b.a.z == 1 or supported_by.keys().len != 0) {
+                // On ground / supported
+                continue;
             }
+
+            all_supported = false;
+
+            var curr: Vec3i = .{
+                .x = @intCast(b.a.x),
+                .y = @intCast(b.a.y),
+                .z = @intCast(b.a.z),
+            };
+
+            while (true) : ({
+                curr.x += dir.x;
+                curr.y += dir.y;
+                curr.z += dir.z;
+            }) {
+                map.set(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z), null);
+                map.set(@intCast(curr.x), @intCast(curr.y), @intCast(curr.z - 1), b);
+                if (curr.x == b.b.x and curr.y == b.b.y and curr.z == b.b.z) break;
+            }
+
+            b.a.z -= 1;
+            b.b.z -= 1;
         }
         if (all_supported) break;
     }
 
     var supports = std.AutoArrayHashMap(*Brick, std.ArrayList(*Brick)).init(allocator);
-    defer supports.deinit();
+    defer {
+        for (supports.values()) |*v| {
+            v.deinit();
+        }
+        supports.deinit();
+    }
 
     for (bricks.items) |*b| {
-        // const gop = try supports.getOrPut(b);
-        // if (!gop.found_existing) {
-        //     gop.value_ptr.* = std.ArrayList(Brick).init(allocator);
-        // }
         for (supported_by_map.get(b).?.keys()) |s| {
             const gop2 = try supports.getOrPut(s);
             if (!gop2.found_existing) {
@@ -190,19 +188,34 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
             }
             try gop2.value_ptr.append(b);
         }
-        // std.log.warn("{} SUP {any}", .{ b, supported_by_map.get(b).?.keys() });
     }
 
-    if (part == .two) {
+    if (part == .one) {
+        var result: u32 = @intCast(bricks.items.len - supports.keys().len); // Account for bricks which don't support anything
+        for (supports.values()) |v| {
+            var all_ok = true;
+            for (v.items) |s| {
+                if (supported_by_map.get(s).?.keys().len <= 1) {
+                    all_ok = false;
+                }
+            }
+
+            if (all_ok) result += 1;
+        }
+        return result;
+    } else if (part == .two) {
         var result: u32 = 0;
         for (bricks.items) |*brick| {
             var support_map = std.AutoArrayHashMap(*Brick, std.AutoArrayHashMap(*Brick, void)).init(allocator);
-            defer support_map.deinit();
+            defer {
+                for (support_map.values()) |*v| {
+                    v.deinit();
+                }
+                support_map.deinit();
+            }
             for (supported_by_map.keys(), supported_by_map.values()) |k, v| {
                 try support_map.put(k, try v.clone());
             }
-
-            // std.log.warn("brick {}", .{brick.*});
 
             var queue = std.ArrayList(*Brick).init(allocator);
             defer queue.deinit();
@@ -210,49 +223,20 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
             try queue.append(brick);
 
             while (queue.popOrNull()) |b| {
-                // std.log.err("curr {}", .{b});
                 if (supports.get(b)) |s| {
                     for (s.items) |sn| {
                         var supported_by = support_map.getPtr(sn).?;
                         _ = supported_by.swapRemove(b);
-                        // _ = supported_by.orderedRemove(b);
-                        // std.log.warn("{}: {any}", .{ sn, supported_by.keys() });
                         if (supported_by.keys().len != 0) continue;
                         try queue.append(sn);
                         result += 1;
                     }
-                    // std.log.warn("  sub {any}", .{s.items});
                 }
             }
-
-            // std.log.warn("{}: {}", .{ brick.*, mid_result });
         }
 
         return result;
     }
-
-    var result: u32 = @intCast(bricks.items.len - supports.keys().len);
-    std.log.err("Bricks [{} ; {}] {any}", .{ bricks.items.len, supports.keys().len, bricks.items });
-
-    for (supports.keys(), supports.values()) |k, v| {
-        _ = k;
-        var all_ok = true;
-        for (v.items) |s| {
-            const supported_by = supported_by_map.get(s).?;
-            if (supported_by.keys().len > 1) {
-                // std.log.err("OK", .{});
-            } else {
-                // std.log.err("NO: {any}", .{supported_by.keys()});
-                all_ok = false;
-            }
-        }
-
-        // std.log.err("{} ==> {any}", .{ k, v.items });
-
-        if (all_ok) result += 1;
-    }
-
-    return result;
 }
 
 // Useful stdlib functions
