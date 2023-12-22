@@ -26,10 +26,10 @@ pub fn main() !void {
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {
-    try std.testing.expectEqual(@as(u64, 2), try solve(.one, example1, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 5), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
-    // try std.testing.expectEqual(@as(u64, 6), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 7), try solve(.two, example1, std.testing.allocator));
 }
 
 const Vec3u = struct { x: u16, y: u16, z: u16 };
@@ -37,8 +37,6 @@ const Vec3i = struct { x: i16, y: i16, z: i16 };
 const Brick = struct { a: Vec3u, b: Vec3u };
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    _ = part;
-
     var bricks = std.ArrayList(Brick).init(allocator);
     defer bricks.deinit();
 
@@ -195,9 +193,47 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         // std.log.warn("{} SUP {any}", .{ b, supported_by_map.get(b).?.keys() });
     }
 
-    var result: u32 = @intCast(bricks.items.len - supports.keys().len);
+    if (part == .two) {
+        var result: u32 = 0;
+        for (bricks.items) |*brick| {
+            var support_map = std.AutoArrayHashMap(*Brick, std.AutoArrayHashMap(*Brick, void)).init(allocator);
+            defer support_map.deinit();
+            for (supported_by_map.keys(), supported_by_map.values()) |k, v| {
+                try support_map.put(k, try v.clone());
+            }
 
-    // std.log.err("Bricks [{} ; {}] {any}", .{ bricks.items.len, supports.keys().len, bricks.items });
+            // std.log.warn("brick {}", .{brick.*});
+
+            var queue = std.ArrayList(*Brick).init(allocator);
+            defer queue.deinit();
+
+            try queue.append(brick);
+
+            while (queue.popOrNull()) |b| {
+                // std.log.err("curr {}", .{b});
+                if (supports.get(b)) |s| {
+                    for (s.items) |sn| {
+                        var supported_by = support_map.getPtr(sn).?;
+                        _ = supported_by.swapRemove(b);
+                        // _ = supported_by.orderedRemove(b);
+                        // std.log.warn("{}: {any}", .{ sn, supported_by.keys() });
+                        if (supported_by.keys().len != 0) continue;
+                        try queue.append(sn);
+                        result += 1;
+                    }
+                    // std.log.warn("  sub {any}", .{s.items});
+                }
+            }
+
+            // std.log.warn("{}: {}", .{ brick.*, mid_result });
+        }
+
+        return result;
+    }
+
+    var result: u32 = @intCast(bricks.items.len - supports.keys().len);
+    std.log.err("Bricks [{} ; {}] {any}", .{ bricks.items.len, supports.keys().len, bricks.items });
+
     for (supports.keys(), supports.values()) |k, v| {
         _ = k;
         var all_ok = true;
