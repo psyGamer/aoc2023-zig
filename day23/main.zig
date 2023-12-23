@@ -17,13 +17,11 @@ pub const std_options = struct {
 };
 
 pub fn main() !void {
-    for (0..1000) |_| {
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        defer arena.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
 
-        std.log.info("Result (Part 1): {}", .{try solve(.one, input, &arena)});
-        std.log.info("Result (Part 2): {}", .{try solve(.two, input, &arena)});
-    }
+    std.log.info("Result (Part 1): {}", .{try solve(.one, input, &arena)});
+    std.log.info("Result (Part 2): {}", .{try solve(.two, input, &arena)});
 }
 test "Part 1" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -39,40 +37,19 @@ test "Part 2" {
 }
 
 const Dir = enum(u2) { l, r, u, d };
-
-// Part 1
-const Node = struct {
-    x: u16,
-    y: u16,
-    dir: Dir,
-
-    parent: ?*Node = null,
-
-    g: u32,
-    f: u32,
-
-    pub fn compare(_: void, a: Node, b: Node) std.math.Order {
-        // When adding, it only checks for != .lt, so .eq and .gt can be treated the same
-        if (a.g <= b.g) return .gt;
-        return .lt;
-    }
-};
 const Vec2u = struct { x: u16, y: u16 };
 
-// Part 2
 const NodeState = struct { x: u16, y: u16, dir: Dir };
 const NodeDistance = struct { x: u16, y: u16, dir: Dir, dist: u16 };
 const Leaf = struct { a: ?NodeDistance, b: ?NodeDistance, c: ?NodeDistance };
 
-fn Path(comptime max_position: comptime_int, comptime IndexInt: type, comptime DistInt: type) type {
+fn Path(comptime max_position: comptime_int, comptime Index: type, comptime Dist: type) type {
     return struct {
-        curr_idx: IndexInt,
-        dist: DistInt,
+        curr_idx: Index,
+        dist: Dist,
         visited: std.bit_set.IntegerBitSet(max_position),
     };
 }
-
-// const Path = struct { x: u16, y: u16, dir: Dir, dist: u32, visited: std.AutoArrayHashMap(Vec2u, void) };
 
 fn buildGraph(comptime part: Part, curr_state: NodeState, graph: *std.AutoHashMap(NodeState, Leaf), in: []const u8, width: usize, end_point: Vec2u) !?NodeDistance {
     var curr = curr_state;
@@ -253,8 +230,6 @@ pub fn solve(comptime part: Part, in: []const u8, arena: *std.heap.ArenaAllocato
 
     const allocator = arena.allocator();
 
-    var best: u32 = 0;
-
     const start: NodeState = .{ .x = 1, .y = 0, .dir = .d };
     const end: Vec2u = .{ .x = @intCast(width - 2), .y = @intCast(height - 1) };
 
@@ -339,7 +314,10 @@ pub fn solve(comptime part: Part, in: []const u8, arena: *std.heap.ArenaAllocato
     init_visited.set(invalid_pos_index); // Mark invalid indices as visited so they don't get indexed
 
     var queue = std.ArrayList(Path(max_positions, Index, DistInt)).init(allocator);
-    try queue.append(.{ .curr_idx = start_idx, .dist = 0, .visited = init_visited });
+    try queue.ensureTotalCapacity(max_nodes * 2); // Preallocate a bit
+    queue.appendAssumeCapacity(.{ .curr_idx = start_idx, .dist = 0, .visited = init_visited });
+
+    var best: u32 = 0;
 
     while (queue.items.len > 0) {
         var curr = queue.items[queue.items.len - 1];
@@ -355,19 +333,28 @@ pub fn solve(comptime part: Part, in: []const u8, arena: *std.heap.ArenaAllocato
 
         curr.visited.set(curr.curr_idx.pos_idx);
         if (!curr.visited.isSet(leaf.a_idx.pos_idx)) {
-            try queue.append(.{ .curr_idx = leaf.a_idx, .dist = curr.dist + leaf.a_dist, .visited = curr.visited });
+            // try queue.append(.{ .curr_idx = leaf.a_idx, .dist = curr.dist + leaf.a_dist, .visited = curr.visited });
+            fastArrayListAppend(Path(max_positions, Index, DistInt), &queue, .{ .curr_idx = leaf.a_idx, .dist = curr.dist + leaf.a_dist, .visited = curr.visited });
         }
         if (!curr.visited.isSet(leaf.b_idx.pos_idx)) {
-            try queue.append(.{ .curr_idx = leaf.b_idx, .dist = curr.dist + leaf.b_dist, .visited = curr.visited });
+            // try queue.append(.{ .curr_idx = leaf.b_idx, .dist = curr.dist + leaf.b_dist, .visited = curr.visited });
+            fastArrayListAppend(Path(max_positions, Index, DistInt), &queue, .{ .curr_idx = leaf.b_idx, .dist = curr.dist + leaf.b_dist, .visited = curr.visited });
         }
         if (!curr.visited.isSet(leaf.c_idx.pos_idx)) {
-            try queue.append(.{ .curr_idx = leaf.c_idx, .dist = curr.dist + leaf.c_dist, .visited = curr.visited });
+            // try queue.append(.{ .curr_idx = leaf.c_idx, .dist = curr.dist + leaf.c_dist, .visited = curr.visited });
+            fastArrayListAppend(Path(max_positions, Index, DistInt), &queue, .{ .curr_idx = leaf.c_idx, .dist = curr.dist + leaf.c_dist, .visited = curr.visited });
         }
     }
 
-    best -= 1; // Account for off-by-one in path from start to first split
+    return best - 1; // Account for off-by-one in path from start to first split
+}
 
-    return best;
+// Inlines ArrayList appension + ignores the errors
+inline fn fastArrayListAppend(comptime T: type, list: *std.ArrayList(T), item: T) void {
+    list.ensureTotalCapacity(list.items.len + 1) catch unreachable;
+
+    const new_item_ptr = list.addOneAssumeCapacity();
+    new_item_ptr.* = item;
 }
 
 // Useful stdlib functions
