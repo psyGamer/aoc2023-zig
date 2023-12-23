@@ -19,21 +19,16 @@ pub const std_options = struct {
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
+    const allocator = arena.allocator();
 
-    std.log.info("Result (Part 1): {}", .{try solve(.one, input, &arena)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, input, &arena)});
+    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
+    std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-
-    try std.testing.expectEqual(@as(u64, 94), try solve(.one, example1, &arena));
+    try std.testing.expectEqual(@as(u64, 94), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-
-    try std.testing.expectEqual(@as(u64, 154), try solve(.two, example1, &arena));
+    try std.testing.expectEqual(@as(u64, 154), try solve(.two, example1, std.testing.allocator));
 }
 
 const Dir = enum(u2) { l, r, u, d };
@@ -224,11 +219,9 @@ fn buildGraph(comptime part: Part, curr_state: NodeState, graph: *std.AutoHashMa
     }
 }
 
-pub fn solve(comptime part: Part, in: []const u8, arena: *std.heap.ArenaAllocator) !u64 {
+pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').?;
     const height = in.len / (width + 1);
-
-    const allocator = arena.allocator();
 
     const start: NodeState = .{ .x = 1, .y = 0, .dir = .d };
     const end: Vec2u = .{ .x = @intCast(width - 2), .y = @intCast(height - 1) };
