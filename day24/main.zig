@@ -77,7 +77,6 @@ pub fn solve(comptime part: Part, comptime area_min: comptime_int, comptime area
             // pos,val = (vely/velx)x + (py - (vely/velx)px)
             equ.m = @as(f64, @floatFromInt(hail.vel.y)) / @as(f64, @floatFromInt(hail.vel.x));
             equ.c = @as(f64, @floatFromInt(hail.pos.y)) - equ.m * @as(f64, @floatFromInt(hail.pos.x));
-            // std.log.warn("{} -> {}", .{ hail, equ });
         }
         var result: u32 = 0;
 
@@ -108,7 +107,7 @@ pub fn solve(comptime part: Part, comptime area_min: comptime_int, comptime area
         const cfg = c.Z3_mk_config();
         const ctx = c.Z3_mk_context(cfg);
 
-        const int_sort = c.Z3_mk_int_sort(ctx);
+        const int_sort = c.Z3_mk_real_sort(ctx);
 
         const px = makeVar(ctx, "px", int_sort);
         const py = makeVar(ctx, "py", int_sort);
@@ -138,14 +137,14 @@ pub fn solve(comptime part: Part, comptime area_min: comptime_int, comptime area
             add_args = .{ pz, c.Z3_mk_mul(ctx, mul_args.len, &mul_args) };
             const rz_equ = c.Z3_mk_add(ctx, add_args.len, &add_args);
 
-            mul_args[0] = c.Z3_mk_int(ctx, hail_stone.vel.x, int_sort);
-            add_args = .{ c.Z3_mk_unsigned_int64(ctx, hail_stone.pos.x, int_sort), c.Z3_mk_mul(ctx, mul_args.len, &mul_args) };
+            mul_args[0] = c.Z3_mk_real(ctx, hail_stone.vel.x, 1);
+            add_args = .{ c.Z3_mk_real_int64(ctx, @intCast(hail_stone.pos.x), 1), c.Z3_mk_mul(ctx, mul_args.len, &mul_args) };
             const hx_equ = c.Z3_mk_add(ctx, add_args.len, &add_args);
-            mul_args[0] = c.Z3_mk_int(ctx, hail_stone.vel.y, int_sort);
-            add_args = .{ c.Z3_mk_unsigned_int64(ctx, hail_stone.pos.y, int_sort), c.Z3_mk_mul(ctx, mul_args.len, &mul_args) };
+            mul_args[0] = c.Z3_mk_real(ctx, hail_stone.vel.y, 1);
+            add_args = .{ c.Z3_mk_real_int64(ctx, @intCast(hail_stone.pos.y), 1), c.Z3_mk_mul(ctx, mul_args.len, &mul_args) };
             const hy_equ = c.Z3_mk_add(ctx, add_args.len, &add_args);
-            mul_args[0] = c.Z3_mk_int(ctx, hail_stone.vel.z, int_sort);
-            add_args = .{ c.Z3_mk_unsigned_int64(ctx, hail_stone.pos.z, int_sort), c.Z3_mk_mul(ctx, mul_args.len, &mul_args) };
+            mul_args[0] = c.Z3_mk_real(ctx, hail_stone.vel.z, 1);
+            add_args = .{ c.Z3_mk_real_int64(ctx, @intCast(hail_stone.pos.z), 1), c.Z3_mk_mul(ctx, mul_args.len, &mul_args) };
             const hz_equ = c.Z3_mk_add(ctx, add_args.len, &add_args);
 
             c.Z3_solver_assert(ctx, solver, c.Z3_mk_eq(ctx, rx_equ, hx_equ));
