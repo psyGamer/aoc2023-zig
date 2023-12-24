@@ -64,6 +64,9 @@ pub fn solve(comptime part: Part, comptime area_min: comptime_int, comptime area
         };
 
         try hail_stones.append(.{ .pos = pos, .vel = vel });
+
+        // 3 is enough to solve the equation
+        if (part == .two and hail_stones.items.len == 3) break;
     }
 
     if (part == .one) {
@@ -72,6 +75,7 @@ pub fn solve(comptime part: Part, comptime area_min: comptime_int, comptime area
         try equs.resize(hail_stones.items.len);
 
         for (hail_stones.items, equs.items) |hail, *equ| {
+            // NOTE: All components are non-zero, otherwise this wouldn't always work.
             // pos,val = (vely/velx)(x - px) + py
             // pos,val = (vely/velx)x - (vely/velx)px + py
             // pos,val = (vely/velx)x + (py - (vely/velx)px)
@@ -109,6 +113,9 @@ pub fn solve(comptime part: Part, comptime area_min: comptime_int, comptime area
 
         const int_sort = c.Z3_mk_real_sort(ctx);
 
+        const zero = c.Z3_mk_real(ctx, 0, 1);
+        _ = zero;
+
         const px = makeVar(ctx, "px", int_sort);
         const py = makeVar(ctx, "py", int_sort);
         const pz = makeVar(ctx, "pz", int_sort);
@@ -120,6 +127,16 @@ pub fn solve(comptime part: Part, comptime area_min: comptime_int, comptime area
         var add_args = [_]c.Z3_ast{ undefined, undefined };
 
         const solver = c.Z3_mk_solver(ctx);
+
+        // Add constrains for the velocity to be [-500;500]
+        const min = c.Z3_mk_real(ctx, -500, 1);
+        const max = c.Z3_mk_real(ctx, 500, 1);
+        c.Z3_solver_assert(ctx, solver, c.Z3_mk_le(ctx, min, vx));
+        c.Z3_solver_assert(ctx, solver, c.Z3_mk_le(ctx, vx, max));
+        c.Z3_solver_assert(ctx, solver, c.Z3_mk_le(ctx, min, vy));
+        c.Z3_solver_assert(ctx, solver, c.Z3_mk_le(ctx, vy, max));
+        c.Z3_solver_assert(ctx, solver, c.Z3_mk_le(ctx, min, vz));
+        c.Z3_solver_assert(ctx, solver, c.Z3_mk_le(ctx, vz, max));
 
         for (hail_stones.items, 0..) |hail_stone, i| {
             const t_name = try std.fmt.allocPrintZ(allocator, "t{}", .{i});
