@@ -5,11 +5,11 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
+const builtin = @import("builtin");
+
 pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
-
-const Part = enum { one, two };
 
 pub const std_options = struct {
     pub const log_level = .info;
@@ -20,32 +20,34 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
-    std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+    std.log.info("Result (Part 1): {}", .{try solve(input, allocator)});
+    std.log.info("Result (Part 2): {s}", .{"Merry Christmas"});
 }
 test "Part 1" {
-    try std.testing.expectEqual(@as(u64, 2), try solve(.one, example1, std.testing.allocator));
-}
-test "Part 2" {
-    try std.testing.expectEqual(@as(u64, 6), try solve(.two, example2, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 2), try solve(example1, std.testing.allocator));
 }
 
-pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    _ = part;
+// const Node = struct {
+//     const max_graph_size = 2048;
 
-    var graph = std.StringArrayHashMap(std.ArrayList([]const u8)).init(allocator);
+//     idx: u16,
+//     dist: u16,
+//     visited: std.StaticBitSet(max_graph_size),
+
+//     pub fn compare(_: void, lhs: Node, rhs: Node) std.math.Order {
+//         // When adding, it only checks for != .lt, so .eq and .gt can be treated the same
+//         if (lhs.dist >= rhs.dist) return .gt;
+//         return .lt;
+//     }
+// };
+
+pub fn solve(in: []const u8, allocator: Allocator) !u64 {
+    var unoptimized_graph = std.StringArrayHashMap(std.ArrayList([]const u8)).init(allocator);
     defer {
-        for (graph.values()) |v| {
+        for (unoptimized_graph.values()) |v| {
             v.deinit();
         }
-        graph.deinit();
-    }
-    var double_graph = std.StringArrayHashMap(std.ArrayList([]const u8)).init(allocator);
-    defer {
-        for (double_graph.values()) |v| {
-            v.deinit();
-        }
-        double_graph.deinit();
+        unoptimized_graph.deinit();
     }
 
     var line_iter = tokenizeSca(u8, in, '\n');
@@ -54,192 +56,141 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
 
         var target_iter = splitSca(u8, line["abc: ".len..], ' ');
         while (target_iter.next()) |target| {
-            const gop = try graph.getOrPut(name);
+            const gop = try unoptimized_graph.getOrPut(name);
             if (!gop.found_existing) {
                 gop.value_ptr.* = std.ArrayList([]const u8).init(allocator);
             }
 
             try gop.value_ptr.append(target);
 
-            const gop2 = try double_graph.getOrPut(name);
+            const gop2 = try unoptimized_graph.getOrPut(target);
             if (!gop2.found_existing) {
                 gop2.value_ptr.* = std.ArrayList([]const u8).init(allocator);
             }
-
-            try gop2.value_ptr.append(target);
-
-            const gop3 = try double_graph.getOrPut(target);
-            if (!gop3.found_existing) {
-                gop3.value_ptr.* = std.ArrayList([]const u8).init(allocator);
-            }
-            try gop3.value_ptr.append(name);
+            try gop2.value_ptr.append(name);
         }
     }
 
-    // var rng: usize = 1;
-    // var vis = std.StringHashMap(void).init(allocator);
-    // var curr = double_graph.keys()[0];
-    // var prev: []const u8 = "";
-    // var i: usize = 0;
-    // while (true) : (i += 1) {
-    //     std.log.warn("{s}", .{curr});
-    //     if (!vis.contains(curr)) {
-    //         std.log.warn("NEW {}: {s} -> {s}", .{ i, prev, curr });
-    //         try vis.put(curr, {});
-    //     }
-    //     const next = double_graph.get(curr).?;
-    //     const idx = rng % next.items.len;
-    //     rng = rng *% 17;
-    //     prev = curr;
-    //     curr = next.items[idx];
-    // }
-
-    // rem("bvb", "cmg", &graph);
-    // rem("hfx", "pzl", &graph);
-    // rem("nvd", "jqt", &graph);
-
-    // std.log.warn("{}", .{graph.count()});
-    // var iter = graph.keyIterator();
-    // while (iter.next()) |k| {
-    //     std.log.warn("  - {s}: {}", .{ k.*, graph.get(k.*).?.items.len });
-    //     for (graph.get(k.*).?.items) |k2| {
-    //         std.log.warn("    * {s}: {}", .{ k2, graph.get(k2).?.items.len });
-    //     }
-    // }
-
-    // const Connection = struct { a: []const u8, b: []const u8 };
-    // _ = Connection;
-
-    // const keys = graph.keys();
-    // const values = graph.values();
-    // const max = double_graph.keys().len;
-
-    // std.log.err("Max {} {}", .{ graph.keys().len, max });
-
-    // for (keys, values, 0..) |a, bs, i| {
-    //     std.log.warn("{}", .{i});
-    //     for (bs.items) |b| {
-    //         for (keys, values, 0..) |c, ds, j| {
-    //             if (i == j) continue;
-    //             for (ds.items) |d| {
-    //                 for (keys, values, 0..) |e, fs, k| {
-    //                     if (i == k or j == k) continue;
-    //                     for (fs.items) |f| {
-    //                         const count_a = try countWithLimit(allocator, a, b, c, d, e, f, max, double_graph) orelse continue;
-    //                         if (count_a == max) continue;
-    //                         // const count_b = try countWithLimit(allocator, d, e, f, a, b, c, max - count_a, double_graph) orelse continue;
-    //                         // if (count_a == 0 or count_b == 0) continue;
-    //                         std.log.err("FOUND {} for {s} {s} {s} {s} {s} {s}", .{ count_a, a, b, c, d, e, f });
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    const count_a = try countWithLimit(allocator, "jll", "cmj", "vtv", "lnf", "qhd", "kkp", 9999999, double_graph);
-    std.log.warn("AAA {?} {}", .{ count_a, double_graph.keys().len });
-
-    // const a = try countWithoutLimit(allocator, "bvb", graph);
-    // const b = try countWithLimit(allocator, "cmg", max - a, graph);
-    // std.log.err("COUNT1 {}", .{a});
-    // std.log.err("COUNT2 {?}", .{b});
-
-    return 0;
-}
-
-fn rem(a: []const u8, b: []const u8, graph: *std.StringArrayHashMap(std.ArrayList([]const u8))) void {
-    var a_ele = graph.getPtr(a).?;
-    for (a_ele.items, 0..) |t, i| {
-        if (!std.mem.eql(u8, t, b)) continue;
-        _ = a_ele.swapRemove(i);
-        break;
-    }
-    var b_ele = graph.getPtr(b).?;
-    for (b_ele.items, 0..) |t, i| {
-        if (!std.mem.eql(u8, t, a)) continue;
-        _ = b_ele.swapRemove(i);
-        break;
-    }
-}
-
-fn countWithoutLimit(allocator: Allocator, start: []const u8, graph: std.StringArrayHashMap(std.ArrayList([]const u8))) !usize {
-    var visited = std.StringHashMap(void).init(allocator);
-    defer visited.deinit();
-
-    var queue = std.ArrayList([]const u8).init(allocator);
-    defer queue.deinit();
-    try queue.append(start);
-
-    while (queue.popOrNull()) |curr| {
-        if (visited.contains(curr)) continue;
-        try visited.put(curr, {});
-        try queue.appendSlice((graph.get(curr) orelse continue).items);
+    // If every node has at least 4 edges, doing 3 BFSs which remove visited nodes still leaves 1 possible connection
+    if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) {
+        var min: usize = std.math.maxInt(usize);
+        for (unoptimized_graph.values()) |v| {
+            min = @min(min, v.items.len);
+        }
+        std.debug.assert(min >= 4);
     }
 
-    return visited.count();
-}
-fn countWithLimit(allocator: Allocator, a: []const u8, b: []const u8, c: []const u8, d: []const u8, e: []const u8, f: []const u8, max_count: usize, graph: std.StringArrayHashMap(std.ArrayList([]const u8))) !?usize {
-    var visited = std.StringHashMap(void).init(allocator);
-    defer visited.deinit();
+    var seed: u64 = undefined;
+    try std.os.getrandom(std.mem.asBytes(&seed));
 
-    var queue = std.ArrayList([]const u8).init(allocator);
-    defer queue.deinit();
-    try queue.append(a);
+    var rng = std.rand.Xoroshiro128.init(seed);
 
-    while (queue.popOrNull()) |curr| {
-        if (visited.contains(curr)) continue;
-        // std.log.warn("curr {s}", .{curr});
-        try visited.put(curr, {});
-        if (visited.count() > max_count) return null;
-        const next = (graph.get(curr) orelse continue).items;
-        try queue.ensureUnusedCapacity(next.len);
+    const graph = try allocator.alloc([]u16, unoptimized_graph.count());
+    defer {
+        for (unoptimized_graph.values(), graph) |values, *v| {
+            // We remove more and more values from this slice over time, so the .len will be inaccurate
+            v.len = values.items.len;
+            allocator.free(v.*);
+        }
+        allocator.free(graph);
+    }
 
-        if (std.mem.eql(u8, curr, a)) {
-            for (next) |n| {
-                if (std.mem.eql(u8, n, d)) continue;
-                // std.log.warn("  a next {s}", .{n});
-                queue.appendAssumeCapacity(n);
-            }
-        } else if (std.mem.eql(u8, curr, b)) {
-            for (next) |n| {
-                if (std.mem.eql(u8, n, e)) continue;
-                // std.log.warn("  b next {s}", .{n});
-                queue.appendAssumeCapacity(n);
-            }
-        } else if (std.mem.eql(u8, curr, c)) {
-            for (next) |n| {
-                if (std.mem.eql(u8, n, f)) continue;
-                // std.log.warn("  c next {s}", .{n});
-                queue.appendAssumeCapacity(n);
-            }
-        } else if (std.mem.eql(u8, curr, d)) {
-            for (next) |n| {
-                if (std.mem.eql(u8, n, a)) continue;
-                // std.log.warn("  c next {s}", .{n});
-                queue.appendAssumeCapacity(n);
-            }
-        } else if (std.mem.eql(u8, curr, e)) {
-            for (next) |n| {
-                if (std.mem.eql(u8, n, b)) continue;
-                // std.log.warn("  c next {s}", .{n});
-                queue.appendAssumeCapacity(n);
-            }
-        } else if (std.mem.eql(u8, curr, f)) {
-            for (next) |n| {
-                if (std.mem.eql(u8, n, c)) continue;
-                // std.log.warn("  c next {s}", .{n});
-                queue.appendAssumeCapacity(n);
-            }
-        } else {
-            for (next) |n| {
-                // std.log.warn("  d next {s}", .{n});
-                queue.appendAssumeCapacity(n);
-            }
+    for (unoptimized_graph.values(), graph) |v, *g| {
+        g.* = try allocator.alloc(u16, v.items.len);
+        for (v.items, 0..) |n, j| {
+            g.*[j] = @intCast(unoptimized_graph.getIndex(n).?);
         }
     }
 
-    return visited.count();
+    const Node = struct { idx: u16, prev_idx: u16, dist: u16 };
+
+    var queue = std.ArrayList(Node).init(allocator);
+    defer queue.deinit();
+    var floodfill_queue = std.ArrayList(u16).init(allocator);
+    defer floodfill_queue.deinit();
+
+    const dist = try allocator.alloc(u16, graph.len);
+    defer allocator.free(dist);
+    const prev = try allocator.alloc(u16, graph.len);
+    defer allocator.free(prev);
+    const visited = try allocator.alloc(bool, graph.len);
+    defer allocator.free(visited);
+
+    while (true) {
+        const start_idx: u16 = @intCast(rng.next() % (graph.len - 1));
+
+        for (0..3) |_| {
+            queue.clearRetainingCapacity();
+            try queue.append(.{ .idx = start_idx, .prev_idx = std.math.maxInt(u16), .dist = 0 });
+
+            @memset(dist, std.math.maxInt(u16));
+            @memset(prev, std.math.maxInt(u16));
+
+            var max_dist: u16 = 0;
+            var max_dist_idx: u16 = undefined;
+
+            while (queue.popOrNull()) |curr| {
+                if (dist[curr.idx] <= curr.dist) continue;
+                dist[curr.idx] = curr.dist;
+                prev[curr.idx] = curr.prev_idx;
+
+                if (curr.dist > max_dist) {
+                    max_dist = curr.dist;
+                    max_dist_idx = curr.idx;
+                }
+
+                const next = graph[curr.idx];
+                try queue.ensureUnusedCapacity(next.len);
+                for (next) |n| {
+                    queue.appendAssumeCapacity(.{ .idx = n, .prev_idx = curr.idx, .dist = curr.dist + 1 });
+                }
+            }
+
+            // Remove the path from the graph
+            var curr_idx = max_dist_idx;
+            while (true) {
+                const next_idx = prev[curr_idx];
+                if (next_idx == std.math.maxInt(u16)) break;
+
+                _ = swapRemove(u16, &graph[curr_idx], indexOf(u16, graph[curr_idx], next_idx).?);
+                _ = swapRemove(u16, &graph[next_idx], indexOf(u16, graph[next_idx], curr_idx).?);
+
+                curr_idx = next_idx;
+            }
+        }
+
+        // Floodfill from the starting node. If the two sets are now seperated, this should result in a set size of != all nodes.
+        floodfill_queue.clearRetainingCapacity();
+        try floodfill_queue.append(start_idx);
+
+        @memset(visited, false);
+
+        var set_size_a: u16 = 0;
+
+        while (floodfill_queue.popOrNull()) |curr_idx| {
+            if (visited[curr_idx]) continue;
+            visited[curr_idx] = true;
+            set_size_a += 1;
+
+            const next = graph[curr_idx];
+            try floodfill_queue.ensureUnusedCapacity(next.len);
+            for (next) |n| {
+                floodfill_queue.appendAssumeCapacity(n);
+            }
+        }
+
+        if (set_size_a == graph.len) continue;
+        const set_size_b = graph.len - set_size_a;
+
+        return set_size_a * set_size_b;
+    }
+}
+
+fn swapRemove(comptime T: type, buffer: *[]T, index: usize) T {
+    const item = buffer.*[index];
+    buffer.*[index] = buffer.*[buffer.len - 1];
+    buffer.len -= 1;
+    return item;
 }
 
 // Useful stdlib functions

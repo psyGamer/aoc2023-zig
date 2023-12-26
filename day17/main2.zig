@@ -40,34 +40,38 @@ fn Node(comptime part: Part) type {
     return struct {
         const Self = @This();
 
-        x: u8,
-        y: u8,
-        dir: Dir,
-        dist: u8,
-        total_dist: u32,
+        const State = packed struct(u24) {
+            x: u8,
+            y: u8,
+            dir: Dir,
+            dist: u6,
+        };
+
+        state: State,
+        total_dist: u16,
 
         const minimum_dist = if (part == .one) 0 else 4;
         const maximum_dist = if (part == .one) 3 else 10;
 
         pub inline fn canLeft(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
-            if (n.dist < minimum_dist) return null;
+            if (n.state.dist < minimum_dist) return null;
             var new: Self = b: {
-                switch (n.dir) {
+                switch (n.state.dir) {
                     .r => {
-                        if (n.y == 0) return null;
-                        break :b .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = 1, .total_dist = undefined };
+                        if (n.state.y == 0) return null;
+                        break :b .{ .state = .{ .x = n.state.x, .y = n.state.y - 1, .dir = .u, .dist = 1 }, .total_dist = undefined };
                     },
                     .l => {
-                        if (n.y == height - 1) return null;
-                        break :b .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = 1, .total_dist = undefined };
+                        if (n.state.y == height - 1) return null;
+                        break :b .{ .state = .{ .x = n.state.x, .y = n.state.y + 1, .dir = .d, .dist = 1 }, .total_dist = undefined };
                     },
                     .u => {
-                        if (n.x == 0) return null;
-                        break :b .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = 1, .total_dist = undefined };
+                        if (n.state.x == 0) return null;
+                        break :b .{ .state = .{ .x = n.state.x - 1, .y = n.state.y, .dir = .l, .dist = 1 }, .total_dist = undefined };
                     },
                     .d => {
-                        if (n.x == width - 1) return null;
-                        break :b .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = 1, .total_dist = undefined };
+                        if (n.state.x == width - 1) return null;
+                        break :b .{ .state = .{ .x = n.state.x + 1, .y = n.state.y, .dir = .r, .dist = 1 }, .total_dist = undefined };
                     },
                 }
             };
@@ -76,24 +80,24 @@ fn Node(comptime part: Part) type {
         }
 
         pub inline fn canRight(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
-            if (n.dist < minimum_dist) return null;
+            if (n.state.dist < minimum_dist) return null;
             var new: Self = b: {
-                switch (n.dir) {
+                switch (n.state.dir) {
                     .l => {
-                        if (n.y == 0) return null;
-                        break :b .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = 1, .total_dist = undefined };
+                        if (n.state.y == 0) return null;
+                        break :b .{ .state = .{ .x = n.state.x, .y = n.state.y - 1, .dir = .u, .dist = 1 }, .total_dist = undefined };
                     },
                     .r => {
-                        if (n.y == height - 1) return null;
-                        break :b .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = 1, .total_dist = undefined };
+                        if (n.state.y == height - 1) return null;
+                        break :b .{ .state = .{ .x = n.state.x, .y = n.state.y + 1, .dir = .d, .dist = 1 }, .total_dist = undefined };
                     },
                     .d => {
-                        if (n.x == 0) return null;
-                        break :b .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = 1, .total_dist = undefined };
+                        if (n.state.x == 0) return null;
+                        break :b .{ .state = .{ .x = n.state.x - 1, .y = n.state.y, .dir = .l, .dist = 1 }, .total_dist = undefined };
                     },
                     .u => {
-                        if (n.x == width - 1) return null;
-                        break :b .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = 1, .total_dist = undefined };
+                        if (n.state.x == width - 1) return null;
+                        break :b .{ .state = .{ .x = n.state.x + 1, .y = n.state.y, .dir = .r, .dist = 1 }, .total_dist = undefined };
                     },
                 }
             };
@@ -102,24 +106,24 @@ fn Node(comptime part: Part) type {
         }
 
         pub inline fn canForward(n: Self, width: usize, height: usize, buffer: []const u8) ?Self {
-            if (n.dist >= maximum_dist) return null;
+            if (n.state.dist >= maximum_dist) return null;
             var new: Self = b: {
-                switch (n.dir) {
+                switch (n.state.dir) {
                     .l => {
-                        if (n.x == 0) return null;
-                        break :b .{ .x = n.x - 1, .y = n.y, .dir = .l, .dist = n.dist + 1, .total_dist = undefined };
+                        if (n.state.x == 0) return null;
+                        break :b .{ .state = .{ .x = n.state.x - 1, .y = n.state.y, .dir = .l, .dist = n.state.dist + 1 }, .total_dist = undefined };
                     },
                     .r => {
-                        if (n.x == width - 1) return null;
-                        break :b .{ .x = n.x + 1, .y = n.y, .dir = .r, .dist = n.dist + 1, .total_dist = undefined };
+                        if (n.state.x == width - 1) return null;
+                        break :b .{ .state = .{ .x = n.state.x + 1, .y = n.state.y, .dir = .r, .dist = n.state.dist + 1 }, .total_dist = undefined };
                     },
                     .u => {
-                        if (n.y == 0) return null;
-                        break :b .{ .x = n.x, .y = n.y - 1, .dir = .u, .dist = n.dist + 1, .total_dist = undefined };
+                        if (n.state.y == 0) return null;
+                        break :b .{ .state = .{ .x = n.state.x, .y = n.state.y - 1, .dir = .u, .dist = n.state.dist + 1 }, .total_dist = undefined };
                     },
                     .d => {
-                        if (n.y == height - 1) return null;
-                        break :b .{ .x = n.x, .y = n.y + 1, .dir = .d, .dist = n.dist + 1, .total_dist = undefined };
+                        if (n.state.y == height - 1) return null;
+                        break :b .{ .state = .{ .x = n.state.x, .y = n.state.y + 1, .dir = .d, .dist = n.state.dist + 1 }, .total_dist = undefined };
                     },
                 }
             };
@@ -128,13 +132,13 @@ fn Node(comptime part: Part) type {
         }
 
         pub inline fn getKey(n: Self) u24 {
-            return 4 * (@as(u24, n.y) << 8 | n.x) + @intFromEnum(n.dir);
+            return 4 * (@as(u24, n.state.y) << 8 | n.state.x) + @intFromEnum(n.state.dir);
         }
         pub inline fn getCost(n: Self, width: usize, buffer: []const u8) u8 {
-            return getAtPos(n.x, n.y, width + 1, buffer) - '0';
+            return getAtPos(n.state.x, n.state.y, width + 1, buffer) - '0';
         }
         pub fn compare(_: void, a: Self, b: Self) std.math.Order {
-            // When adding, it only checks for != .lt, so .eq and .gt can be treated the same
+            // When adding, it on.stately checks for != .lt, so .eq and .gt can be treated the same
             if (a.total_dist >= b.total_dist) return .gt;
             return .lt;
         }
@@ -145,11 +149,11 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').?;
     const height = in.len / (width + 1);
 
-    const start: Node(part) = .{ .x = 0, .y = 0, .dir = .r, .dist = 0, .total_dist = 0 };
+    const start: Node(part) = .{ .state = .{ .x = 0, .y = 0, .dir = .r, .dist = 0 }, .total_dist = 0 };
 
     // Bitset for each direction. Each bit determines if the node was visited with that dist.
     // The 1/10 can't be cached by this, because a u9 would hurt performance more.
-    var visited = try allocator.alloc(std.StaticBitSet(8), std.math.maxInt(u16) * 4);
+    var visited = try allocator.alloc(std.StaticBitSet(8), std.math.maxInt(u16));
     defer allocator.free(visited);
     @memset(visited, std.StaticBitSet(8).initEmpty());
 
@@ -167,13 +171,13 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     if (neighbours[2]) |e| queue.add(e) catch unreachable;
 
     while (queue.removeOrNull()) |curr| {
-        if (curr.dist <= 8) {
+        if (curr.state.dist <= 8) {
             const visited_ptr = &visited[curr.getKey()];
-            if (visited_ptr.isSet(curr.dist - 1)) continue;
-            visited_ptr.set(curr.dist - 1);
+            if (visited_ptr.isSet(curr.state.dist - 1)) continue;
+            visited_ptr.set(curr.state.dist - 1);
         }
 
-        if (curr.x == width - 1 and curr.y == height - 1 and curr.dist >= Node(part).minimum_dist) {
+        if (curr.state.x == width - 1 and curr.state.y == height - 1 and curr.state.dist >= Node(part).minimum_dist) {
             return curr.total_dist;
         }
 

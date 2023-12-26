@@ -5,7 +5,7 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
-const input = @embedFile("input.txt");
+pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 const example3 = @embedFile("example3.txt");
@@ -111,7 +111,7 @@ fn advancePosition(map: Array2D(PipeTile), position: *Vec2u, prev_dir: *Directio
 fn getAtPos(x: usize, y: usize, width: usize, buf: []const u8) u8 {
     return buf[y * width + x];
 }
-fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
+pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const width = indexOf(u8, in, '\n').? + 1;
     const height = in.len / width;
 

@@ -5,7 +5,7 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
-const input = @embedFile("input.txt");
+pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
@@ -48,7 +48,7 @@ fn resolveCardsAdded(cards: []const Card, memo: *std.AutoHashMap(usize, u32), ca
     return count;
 }
 
-fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
+pub fn solve(part: Part, in: []const u8, allocator: Allocator) !u32 {
     var result: u32 = 0;
 
     // Everything is formatting in a nice grid.

@@ -17,14 +17,14 @@ pub const std_options = struct {
 };
 
 pub fn main() !void {
-    for (0..100) |_| {
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        defer arena.deinit();
-        const allocator = arena.allocator();
+    // for (0..100) |_| {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
-        std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
-        std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
-    }
+    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
+    std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+    // }
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 46), try solve(.one, example1, std.testing.allocator));

@@ -5,7 +5,7 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
-const input = @embedFile("input.txt");
+pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
@@ -55,7 +55,7 @@ const Entry = struct {
     }
 };
 
-fn solve(comptime part: Part, in: []const u8) !u32 {
+pub fn solve(comptime part: Part, in: []const u8) !u32 {
     var result: u32 = 0;
 
     var i: u32 = 1;

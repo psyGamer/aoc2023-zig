@@ -5,7 +5,7 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
-const input = @embedFile("input.txt");
+pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 const example3 = @embedFile("example3.txt");
@@ -43,7 +43,7 @@ const Node = struct {
     right: NodeID,
 };
 
-fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
+pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     var line_iter = tokenizeSca(u8, in, '\n');
 
     const route = line_iter.next().?;

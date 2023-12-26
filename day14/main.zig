@@ -21,7 +21,7 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
+    std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {

@@ -18,7 +18,7 @@ pub const std_options = struct {
 };
 
 pub fn main() !void {
-    for (0..100) |_| {
+    for (0..1) |_| {
         var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         defer arena.deinit();
         const allocator = arena.allocator();

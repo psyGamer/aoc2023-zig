@@ -27,7 +27,7 @@ test "Part 2" {
     try std.testing.expectEqual(@as(u64, 400), try solve(.two, example1, std.testing.allocator));
 }
 
-fn solve_h_reflect(line: []const u8, memo: []bool) void {
+pub fn solve_h_reflect(line: []const u8, memo: []bool) void {
     for (1..line.len) |i| {
         if (!memo[i - 1]) continue;
 
@@ -45,7 +45,7 @@ fn solve_h_reflect(line: []const u8, memo: []bool) void {
         }
     }
 }
-fn solve_v_reflect(lines: [][]const u8, x: usize, memo: []bool) void {
+pub fn solve_v_reflect(lines: [][]const u8, x: usize, memo: []bool) void {
     for (1..lines.len) |i| {
         if (!memo[i - 1]) continue;
 
@@ -88,7 +88,7 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         var v_point: u32 = 0;
 
         // Check for V reflectivity
-        var h_reflect = try allocator.alloc(bool, lines.items[0].len - 1);
+        const h_reflect = try allocator.alloc(bool, lines.items[0].len - 1);
         defer allocator.free(h_reflect);
         @memset(h_reflect, true);
 
@@ -101,7 +101,7 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         }
 
         // Check for H reflectivity
-        var v_reflect = try allocator.alloc(bool, lines.items.len - 1);
+        const v_reflect = try allocator.alloc(bool, lines.items.len - 1);
         defer allocator.free(v_reflect);
         @memset(v_reflect, true);
 

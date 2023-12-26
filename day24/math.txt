@@ -1,0 +1,103 @@
+(p0 - p1) x (v0 - v1) = 0
+(p0 - p2) x (v0 - v2) = 0
+
+(p0x - p1x) x (v0x - v1x) = 0
+(p0y - p1y) y (v0y - v1y) = 0
+(p0z - p1z) z (v0z - v1z) = 0
+(p0x - p2x) x (v0x - v2x) = 0
+(p0y - p2y) y (v0y - v2y) = 0
+(p0z - p2z) z (v0z - v2z) = 0
+
+(px - 19) x (vx + 2) = 0
+(py - 13) x (vy - 1) = 0
+(pz - 30) x (vz + 2) = 0
+(px - 18) x (vx + 1) = 0
+(py - 19) x (vy + 1) = 0
+(pz - 22) x (vz + 2) = 0
+
+
+(x - 19) cross (a + 2) = 0
+(y - 13) cross (b - 1) = 0
+(z - 30) cross (c + 2) = 0
+(x - 18) cross (a + 1) = 0
+(y - 19) cross (b + 1) = 0
+(z - 22) cross (c + 2) = 0
+
+==========================
+
+(p0 - p1) x (v0 - v1) = 0
+(p0 - p2) x (v0 - v2) = 0
+
+
+// Cross Product: [
+	ay*bz - az*by, 
+	az*bx - ax*bz, 
+	ax*by - ay*bx
+]
+
+(p0y - p1y) * (v0z - v1z) - (p0z - p1z) * (v0y - v1y) = 0
+(p0z - p1z) * (v0x - v1x) - (p0x - p1x) * (v0z - v1z) = 0
+(p0x - p1x) * (v0y - v1y) - (p0y - p1y) * (v0x - v1x) = 0
+
+(y - 13) * (c + 2) - (z - 30) * (b - 1) = 0
+(z - 30) * (a + 2) - (x - 19) * (c + 2) = 0
+(x - 19) * (b - 1) - (y - 13) * (a + 2) = 0
+
+(y - 19) * (c + 2) - (z - 22) * (b + 1) = 0
+(z - 22) * (a + 1) - (x - 18) * (c + 2) = 0
+(x - 18) * (b + 1) - (y - 19) * (a + 1) = 0
+
+
+r_px+r_vx*t = h_px+h_vx*t
+r_py+r_vy*t = h_py+h_vy*t
+r_pz+r_vz*t = h_pz+h_vz*t
+
+
+r_px+r_vx*t = h_px+h_vx*t
+r_px+r_vx*t - (h_px+h_vx*t)
+r_px+r_vx*t - h_px-h_vx*t
+
+r_px-h_px + r_vx*t-h_vx*t = 0
+
+(r_px - h1_px) + t*(r_vx - h1_vx) = 0
+(r_px - h2_px) + t*(r_vx - h2_vx) = 0
+
+(r_px - h1_px) + t*(r_vx - h1_vx) = (r_px - h2_px) + t*(r_vx - h2_vx)
+(r_px - h1_px) - (r_px - h2_px) + t*(r_vx - h1_vx) - t*(r_vx - h2_vx) = 0
+r_px - h1_px - r_px + h2_px + t*((r_vx - h1_vx) - (r_vx - h2_vx)) = 0<
+
+=============================
+
+(r_px - h1_px) + t*(r_vx - h1_vx) = 0
+(r_px - h2_px) + t*(r_vx - h2_vx) = 0
+
+Solve for r_px:
+(r_px - h1_px) + t*(r_vx - h1_vx) = 0
+r_px - h1_px + t*(r_vx - h1_vx) = 0
+-h1_px + t*(r_vx - h1_vx) = -r_px
+h1_px - t*(r_vx - h1_vx) = r_px
+
+Solve for r_vx:
+(r_px - h1_px) + t*(r_vx - h1_vx) = 0
+(r_px - h1_px) + t*r_vx - t*h1_vx = 0
+(r_px - h1_px) - t*h1_vx = -t*r_vx
+((r_px - h1_px) - t*h1_vx) / -t = r_vx
+(r_px - h1_px) / -t + h1_vx = r_vx
+
+Substitude r_px:
+// (r_px - h1_px) + t*(r_vx - h1_vx) = 0
+// (h1_px - t*(r_vx - h1_vx) - h1_px) + t*(r_vx - h1_vx) = 0
+
+r_px+r_vx*t = h1_px+h1_vx*t
+h1_px - t*(r_vx - h1_vx)+r_vx*t = h1_px+h1_vx*t
+-t*(r_vx - h1_vx)+r_vx*t = h1_vx*t
+
+
+
+
+r_px - h1_px + t*r_vx - t*h1_vx = 0
+r_px - h2_px + t*r_vx - t*h2_vx = 0
+
+// 2*r_px - h1_px - h2_px + 2t*r_Vx - t*h1_vx - t*h2_vx = 0
+-h1_px - (-h2_px) - t*h1_vx - (-t*h2_vx) = 0
+-h1_px + h2_px - t*h1_vx + t*h2_vx = 0

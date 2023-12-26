@@ -17,12 +17,14 @@ pub const std_options = struct {
 };
 
 pub fn main() !void {
+    // for (0..10000) |_| {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     std.log.info("Result (Part 1): {}", .{try solve(.one, input, allocator)});
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
+    // }
 }
 test "Part 1" {
     try std.testing.expectEqual(@as(u64, 62), try solve(.one, example1, std.testing.allocator));
@@ -38,38 +40,6 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     defer nodes.deinit();
     try nodes.append(.{ .x = 0, .y = 0 });
 
-    var last_dir: u8 = 0;
-    var last_pos: Vec2i = nodes.getLast();
-
-    const clock_wise = b: {
-        const first = in[0];
-        last_dir = in[lastIndexOf(u8, in[0..(in.len - 1)], '\n').? + 1];
-        // std.log.err("{c} {c}", .{ first, last_dir });
-        break :b switch (first) {
-            'L' => switch (last_dir) {
-                'U' => false,
-                'D' => true,
-                else => unreachable,
-            },
-            'R' => switch (last_dir) {
-                'U' => true,
-                'D' => false,
-                else => unreachable,
-            },
-            'U' => switch (last_dir) {
-                'R' => false,
-                'L' => true,
-                else => unreachable,
-            },
-            'D' => switch (last_dir) {
-                'R' => true,
-                'L' => false,
-                else => unreachable,
-            },
-            else => unreachable,
-        };
-    };
-
     var line_iter = tokenizeSca(u8, in, '\n');
     while (line_iter.next()) |line| {
         var dir: u8 = undefined;
@@ -78,92 +48,31 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
             const dir_text, var rest = splitOnceScalar(u8, line, ' ');
             dir = dir_text[0];
             const dist_text, rest = splitOnceScalar(u8, rest, ' ');
-            dist = try parseInt(u8, dist_text, 10) * 2;
+            dist = try parseInt(u8, dist_text, 10);
         } else if (part == .two) {
-            _, const hex = splitOnceScalar(u8, line, '#');
-            dir = switch (hex[5]) {
+            const idx = indexOf(u8, line, '#').? + 1;
+            dir = switch (line[idx + 5]) {
                 '0' => 'R',
                 '1' => 'D',
                 '2' => 'L',
                 '3' => 'U',
                 else => unreachable,
             };
-            dist = try parseInt(u31, hex[0..5], 16) * 2;
+            dist = try parseInt(u31, line[idx..(idx + 5)], 16);
         }
 
-        const offset: Vec2i = if (clock_wise)
-            switch (last_dir) {
-                'L' => switch (dir) {
-                    'U' => .{ .x = -1, .y = 1 },
-                    'D' => .{ .x = 1, .y = 1 },
-                    else => unreachable,
-                },
-                'R' => switch (dir) {
-                    'U' => .{ .x = -1, .y = -1 },
-                    'D' => .{ .x = 1, .y = -1 },
-                    else => unreachable,
-                },
-                'U' => switch (dir) {
-                    'L' => .{ .x = -1, .y = 1 },
-                    'R' => .{ .x = -1, .y = -1 },
-                    else => unreachable,
-                },
-                'D' => switch (dir) {
-                    'L' => .{ .x = 1, .y = 1 },
-                    'R' => .{ .x = 1, .y = -1 },
-                    else => unreachable,
-                },
-                else => unreachable,
-            }
-        else switch (last_dir) {
-            'L' => switch (dir) {
-                'U' => .{ .x = 1, .y = -1 },
-                'D' => .{ .x = -1, .y = -1 },
-                else => unreachable,
-            },
-            'R' => switch (dir) {
-                'U' => .{ .x = 1, .y = 1 },
-                'D' => .{ .x = -1, .y = 1 },
-                else => unreachable,
-            },
-            'U' => switch (dir) {
-                'L' => .{ .x = 1, .y = -1 },
-                'R' => .{ .x = 1, .y = 1 },
-                else => unreachable,
-            },
-            'D' => switch (dir) {
-                'L' => .{ .x = -1, .y = -1 },
-                'R' => .{ .x = -1, .y = 1 },
-                else => unreachable,
-            },
+        const last = nodes.getLast();
+        try nodes.append(switch (dir) {
+            'L' => .{ .x = last.x - dist, .y = last.y },
+            'R' => .{ .x = last.x + dist, .y = last.y },
+            'U' => .{ .x = last.x, .y = last.y - dist },
+            'D' => .{ .x = last.x, .y = last.y + dist },
             else => unreachable,
-        };
-        _ = offset;
-        // std.log.warn("{s} {c} {} {}", .{ line, last_dir, offset, last_pos });
-        last_dir = dir;
-
-        // nodes.items[nodes.items.len - 1].x += offset.x;
-        // nodes.items[nodes.items.len - 1].y += offset.y;
-
-        last_pos = switch (dir) {
-            'L' => .{ .x = last_pos.x - dist, .y = last_pos.y },
-            'R' => .{ .x = last_pos.x + dist, .y = last_pos.y },
-            'U' => .{ .x = last_pos.x, .y = last_pos.y - dist },
-            'D' => .{ .x = last_pos.x, .y = last_pos.y + dist },
-            else => unreachable,
-        };
-        try nodes.append(last_pos);
-
-        var x: f32 = @as(f32, @floatFromInt(nodes.items[nodes.items.len - 2].x)) / 2.0;
-        _ = x;
-        var y: f32 = @as(f32, @floatFromInt(nodes.items[nodes.items.len - 2].y)) / 2.0;
-        _ = y;
-        // std.log.warn("{c} {} : {d} {d}", .{ dir, dist / 2, x, y });
+        });
     }
 
-    // Finish the loop and ensure its counter-clock-wise
+    // Finish the loop
     nodes.items[nodes.items.len - 1] = nodes.items[0];
-    // std.log.warn("{any}", .{nodes});
 
     // Shoelace Algorithm
     const SumInt = i64;
@@ -178,15 +87,14 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     sum2 += nodes.items[0].y * nodes.getLast().x;
     const area = @abs(sum1 - sum2) / 2;
 
-    // Surcumrefence of the polygon
-    var sum3: u64 = 0;
+    // Circumrefence of the polygon
+    var circumfrence: u64 = 0;
     for (0..(nodes.items.len - 1)) |i| {
-        sum3 += @abs(@as(SumInt, nodes.items[i + 1].x) - @as(SumInt, nodes.items[i].x));
-        sum3 += @abs(@as(SumInt, nodes.items[i + 1].y) - @as(SumInt, nodes.items[i].y));
+        circumfrence += @abs(@as(SumInt, nodes.items[i + 1].x) - @as(SumInt, nodes.items[i].x));
+        circumfrence += @abs(@as(SumInt, nodes.items[i + 1].y) - @as(SumInt, nodes.items[i].y));
     }
-    // std.log.warn("{} {}", .{ area, sum3 });
 
-    return (area + sum3) / 4 + 1; // We inflated everything by 2 => / 4 area
+    return area + circumfrence / 2 + 1;
 }
 
 // Useful stdlib functions

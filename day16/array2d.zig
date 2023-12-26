@@ -18,7 +18,7 @@ pub fn Array2D(comptime T: type) type {
             };
         }
         pub fn initWithDefault(allocator: Allocator, width: usize, height: usize, default: T) !Self {
-            var result = try init(allocator, width, height);
+            const result = try init(allocator, width, height);
             @memset(result.data, default);
             return result;
         }

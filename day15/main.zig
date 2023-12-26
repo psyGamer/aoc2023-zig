@@ -12,6 +12,10 @@ const example3 = @embedFile("example3.txt");
 
 const Part = enum { one, two };
 
+pub const std_options = struct {
+    pub const log_level = .info;
+};
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -21,59 +25,72 @@ pub fn main() !void {
     std.log.info("Result (Part 2): {}", .{try solve(.two, input, allocator)});
 }
 test "Part 1" {
-    try std.testing.expectEqual(@as(u64, 374), try solve(.one, example1, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 1320), try solve(.one, example1, std.testing.allocator));
 }
 test "Part 2" {
-    try std.testing.expectEqual(@as(u64, 82000210), try solve(.two, example1, std.testing.allocator));
+    try std.testing.expectEqual(@as(u64, 145), try solve(.two, example1, std.testing.allocator));
 }
 
-const Vec2u = struct { x: usize, y: usize };
-const Vec2ux2 = struct { a: Vec2u, b: Vec2u };
+fn hash(str: []const u8) u8 {
+    var sum: u32 = 0;
+    for (str) |c| {
+        if (c == '\n') continue;
+        sum += c;
+        sum *= 17;
+        sum %= 256;
+    }
+    return @intCast(sum);
+}
 
 pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
-    const width = indexOf(u8, in, '\n').?;
-    const height = in.len / width;
+    var result: u32 = 0;
 
-    var col_with_galaxy = try allocator.alloc(bool, width);
-    defer allocator.free(col_with_galaxy);
-    var row_with_galaxy = try allocator.alloc(bool, height - 1);
-    defer allocator.free(row_with_galaxy);
+    const BoxMap = std.ArrayHashMap([]const u8, u8, SliceCtx(u8), false);
+    var boxes = [_]BoxMap{BoxMap.init(allocator)} ** 256;
 
-    var galaxies = std.ArrayList(Vec2u).init(allocator);
-    defer galaxies.deinit();
+    var comma_iter = tokenizeSca(u8, in, ',');
+    while (comma_iter.next()) |line| {
+        if (part == .one) {
+            result += hash(line);
+            continue;
+        }
 
-    @memset(col_with_galaxy, false);
-    @memset(row_with_galaxy, false);
+        var i: usize = 0;
+        while (i < line.len) : (i += 1) {
+            if (line[i] == '=' or line[i] == '-') break;
+        }
 
-    var y: usize = 0;
-    var line_iter = tokenizeSca(u8, in, '\n');
-    while (line_iter.next()) |line| : (y += 1) {
-        for (line, 0..) |char, x| {
-            if (char == '#') {
-                col_with_galaxy[x] = true;
-                row_with_galaxy[y] = true;
-                try galaxies.append(.{ .x = x, .y = y });
-            }
+        const box = hash(line[0..i]);
+        if (line[i] == '=') {
+            try boxes[box].put(line[0..i], line[i + 1]);
+        } else {
+            _ = boxes[box].orderedRemove(line[0..i]);
         }
     }
 
-    var sum: usize = 0;
+    if (part == .one) return result;
 
-    for (galaxies.items, 0..) |a, i| {
-        for (galaxies.items[i..]) |b| {
-            const start_x = if (a.x > b.x) b.x else a.x;
-            const end_x = if (a.x > b.x) a.x else b.x;
-            const start_y = if (a.y > b.y) b.y else a.y;
-            const end_y = if (a.y > b.y) a.y else b.y;
-            const x_expansion = std.mem.count(bool, col_with_galaxy[start_x..end_x], &.{false}) * (@as(usize, (if (part == .two) 1000000 else 2) - 1));
-            const y_expansion = std.mem.count(bool, row_with_galaxy[start_y..end_y], &.{false}) * (@as(usize, (if (part == .two) 1000000 else 2) - 1));
-
-            sum += @abs(@as(i64, @intCast(a.x)) - @as(i64, @intCast(b.x))) + @as(u64, @intCast(x_expansion));
-            sum += @abs(@as(i64, @intCast(a.y)) - @as(i64, @intCast(b.y))) + @as(u64, @intCast(y_expansion));
+    for (&boxes, 1..) |*box, i| {
+        for (box.keys(), 1..) |key, j| {
+            result += @intCast(i * j * (box.get(key).? - '0'));
         }
+        box.deinit();
     }
 
-    return sum;
+    return result;
+}
+
+fn SliceCtx(comptime T: type) type {
+    return struct {
+        pub fn hash(_: @This(), key: []const T) u32 {
+            var hasher = std.hash.Wyhash.init(0);
+            std.hash.autoHashStrat(&hasher, key, .Deep);
+            return @truncate(hasher.final());
+        }
+        pub fn eql(_: @This(), a: []const T, b: []const T, _: usize) bool {
+            return std.mem.eql(T, a, b);
+        }
+    };
 }
 
 // Useful stdlib functions

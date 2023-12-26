@@ -5,7 +5,7 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
-const input = @embedFile("input.txt");
+pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
@@ -195,7 +195,7 @@ const Hand = struct {
     }
 };
 
-fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
+pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
     var hands = std.ArrayList(Hand).init(allocator);
     defer hands.deinit();
 

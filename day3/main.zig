@@ -5,7 +5,7 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
-const input = @embedFile("input.txt");
+pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
@@ -63,7 +63,7 @@ fn useMapValue(map: Array2D(i32), x: usize, y: usize) u32 {
     return @max(0, value);
 }
 
-fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
+pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
     var result: u32 = 0;
     const width = indexOf(u8, in, '\n').? + 1;
     const height = in.len / width;

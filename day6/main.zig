@@ -5,7 +5,7 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
-const input = @embedFile("input.txt");
+pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
@@ -34,7 +34,7 @@ test "Part 2" {
 
 const Race = struct { time: u64, dist: u64 };
 
-fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
+pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u32 {
     var line_iter = splitSca(u8, in, '\n');
 
     var time_iter = tokenizeSca(u8, line_iter.next().?["Time:     ".len..], ' ');

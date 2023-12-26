@@ -5,7 +5,7 @@ const Map = std.AutoHashMap;
 const StrMap = std.StringHashMap;
 const BitSet = std.DynamicBitSet;
 
-const input = @embedFile("input.txt");
+pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
@@ -26,7 +26,7 @@ test "Part 2" {
     try std.testing.expectEqual(@as(u32, 281), solve(.two, example2));
 }
 
-fn solve(comptime part: Part, in: []const u8) u32 {
+pub fn solve(comptime part: Part, in: []const u8) u32 {
     var result: u32 = 0;
     var iter = tokenizeSca(u8, in, '\n');
     while (iter.next()) |line| {
