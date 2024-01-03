@@ -38,14 +38,6 @@ const NodeState = struct { x: u16, y: u16, dir: Dir };
 const NodeDistance = struct { x: u16, y: u16, dir: Dir, dist: u16 };
 const Leaf = struct { a: ?NodeDistance, b: ?NodeDistance, c: ?NodeDistance };
 
-fn Path(comptime max_position: comptime_int, comptime Index: type, comptime Dist: type) type {
-    return struct {
-        curr_idx: Index,
-        dist: Dist,
-        visited: std.bit_set.IntegerBitSet(max_position),
-    };
-}
-
 fn buildGraph(comptime part: Part, curr_state: NodeState, graph: *std.AutoHashMap(NodeState, Leaf), in: []const u8, width: usize, end_point: Vec2u) !?NodeDistance {
     var curr = curr_state;
     var dist: u16 = 0;
@@ -227,127 +219,99 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
     const end: Vec2u = .{ .x = @intCast(width - 2), .y = @intCast(height - 1) };
 
     var graph = std.AutoHashMap(NodeState, Leaf).init(allocator);
+    defer graph.deinit();
+
     const start_path = try buildGraph(part, .{ .x = start.x, .y = start.y, .dir = .d }, &graph, in, width + 1, end);
     try graph.put(start, .{ .a = start_path, .b = null, .c = null });
 
-    const dir_count = std.math.maxInt(std.meta.Tag(Dir)) + 1;
-    const max_positions = 46;
-    const max_nodes = max_positions * dir_count;
+    const max_positions = 64;
 
-    // Assert that all node-positions fit
     var positions = std.AutoArrayHashMap(Vec2u, void).init(allocator);
     defer positions.deinit();
+
+    try positions.put(.{ .x = start.x, .y = start.y }, {});
+    try positions.put(.{ .x = end.x, .y = end.y }, {});
 
     var graph_iter = graph.keyIterator();
     while (graph_iter.next()) |key| {
         try positions.put(.{ .x = key.x, .y = key.y }, {});
     }
 
-    std.debug.assert(positions.count() < max_positions - 1);
-    std.debug.assert(graph.count() < max_nodes);
+    std.debug.assert(positions.count() <= max_positions);
 
-    const Index = packed struct(u8) {
-        dir: Dir,
-        pos_idx: u6,
-    };
+    const Node = std.bit_set.IntegerBitSet(max_positions);
 
-    const invalid_pos_index = max_positions - 1;
-    const invalid_index: Index = .{ .pos_idx = invalid_pos_index, .dir = undefined };
-    const DistInt = u16;
+    var directed: [max_positions]Node = undefined;
+    var distance: [max_positions][max_positions]u16 = undefined;
 
-    const IndexLeaf = struct {
-        a_idx: Index = invalid_index,
-        b_idx: Index = invalid_index,
-        c_idx: Index = invalid_index,
-        a_dist: DistInt = undefined,
-        b_dist: DistInt = undefined,
-        c_dist: DistInt = undefined,
-    };
-
-    // Flatten the graph into an array
-    // TODO: Just use an array hash map for the graph?
-    try positions.put(.{ .x = start.x, .y = start.y }, {});
-    try positions.put(.{ .x = end.x, .y = end.y }, {});
-
-    // Make sure our tricks work
-    std.debug.assert(@as(u8, @bitCast(Index{ .pos_idx = 0, .dir = .l })) == 0);
-    std.debug.assert(@as(u8, @bitCast(Index{ .pos_idx = 0, .dir = .r })) == 1);
-    std.debug.assert(@as(u8, @bitCast(Index{ .pos_idx = 0, .dir = .u })) == 2);
-    std.debug.assert(@as(u8, @bitCast(Index{ .pos_idx = 0, .dir = .d })) == 3);
-
-    var flattened: [max_nodes]IndexLeaf = [_]IndexLeaf{undefined} ** max_nodes;
     for (positions.keys(), 0..) |pos, i| {
-        for (0..dir_count) |j| {
-            const dir: Dir = @enumFromInt(j);
-            if (graph.get(.{ .x = pos.x, .y = pos.y, .dir = dir })) |value| {
-                flattened[4 * i + j] = .{
-                    .a_idx = if (value.a != null) .{ .pos_idx = @intCast(positions.getIndex(.{ .x = value.a.?.x, .y = value.a.?.y }) orelse invalid_pos_index), .dir = value.a.?.dir } else invalid_index,
-                    .b_idx = if (value.b != null) .{ .pos_idx = @intCast(positions.getIndex(.{ .x = value.b.?.x, .y = value.b.?.y }) orelse invalid_pos_index), .dir = value.b.?.dir } else invalid_index,
-                    .c_idx = if (value.c != null) .{ .pos_idx = @intCast(positions.getIndex(.{ .x = value.c.?.x, .y = value.c.?.y }) orelse invalid_pos_index), .dir = value.c.?.dir } else invalid_index,
-                    .a_dist = if (value.a != null) value.a.?.dist else undefined,
-                    .b_dist = if (value.b != null) value.b.?.dist else undefined,
-                    .c_dist = if (value.c != null) value.c.?.dist else undefined,
-                };
-            } else {
-                flattened[4 * i + j] = .{
-                    .a_idx = invalid_index,
-                    .b_idx = invalid_index,
-                    .c_idx = invalid_index,
-                    .a_dist = undefined,
-                    .b_dist = undefined,
-                    .c_dist = undefined,
-                };
+        var next_set = Node.initEmpty();
+        var distances: [max_positions]u16 = undefined;
+
+        inline for (.{ .l, .r, .u, .d }) |dir| {
+            if (graph.get(.{ .x = pos.x, .y = pos.y, .dir = dir })) |n| {
+                inline for (.{ "a", "b", "c" }) |next_name| {
+                    if (@field(n, next_name)) |next| {
+                        // std.log.warn("Next {} {}", .{ next.x, next.y });
+                        const idx = positions.getIndex(.{ .x = next.x, .y = next.y }).?;
+                        next_set.set(idx);
+                        distances[idx] = @intCast(next.dist);
+                    }
+                }
             }
         }
+
+        directed[i] = next_set;
+        distance[i] = distances;
     }
 
-    const start_idx: Index = .{ .pos_idx = @intCast(positions.getIndex(.{ .x = start.x, .y = start.y }).?), .dir = .d };
-    const end_idx: Index = .{ .pos_idx = @intCast(positions.getIndex(.{ .x = end.x, .y = end.y }).?), .dir = .d };
-    var init_visited = std.bit_set.IntegerBitSet(max_positions).initEmpty();
-    init_visited.set(invalid_pos_index); // Mark invalid indices as visited so they don't get indexed
+    const Path2 = struct {
+        curr: Node,
+        seen: std.bit_set.IntegerBitSet(max_positions),
+        dist: u32,
+        curr_idx: u16,
+    };
 
-    var queue = std.ArrayList(Path(max_positions, Index, DistInt)).init(allocator);
-    try queue.ensureTotalCapacity(max_nodes * 2); // Preallocate a bit
-    queue.appendAssumeCapacity(.{ .curr_idx = start_idx, .dist = 0, .visited = init_visited });
+    var queue = std.ArrayList(Path2).init(allocator);
+    defer queue.deinit();
+
+    const start_idx: u16 = @intCast(positions.getIndex(.{ .x = start.x, .y = start.y }).?);
+    const end_idx: u16 = @intCast(positions.getIndex(end).?);
+    const end_idx_mask = @as(u64, 1) << @intCast(end_idx);
+    try queue.append(.{ .curr = directed[start_idx], .seen = std.bit_set.IntegerBitSet(max_positions).initEmpty(), .dist = 0, .curr_idx = start_idx });
 
     var best: u32 = 0;
 
-    while (queue.items.len > 0) {
-        var curr = queue.items[queue.items.len - 1];
-        queue.items[queue.items.len - 1] = undefined;
-        queue.items.len -= 1;
+    while (queue.popOrNull()) |path| {
+        var mask = path.curr.mask;
+        try queue.ensureUnusedCapacity(@popCount(mask));
 
-        if (@as(u8, @bitCast(curr.curr_idx)) == @as(u8, @bitCast(end_idx))) {
-            best = @max(best, curr.dist);
+        // Move the if statement out of the loop
+        if (mask & end_idx_mask != 0) {
+            mask ^= end_idx_mask;
+            best = @max(best, path.dist + distance[path.curr_idx][end_idx]);
             continue;
         }
 
-        const leaf = flattened[@as(u8, @bitCast(curr.curr_idx))];
+        while (mask != 0) {
+            const idx = @ctz(mask);
+            mask ^= @as(@TypeOf(mask), 1) << @intCast(idx);
 
-        curr.visited.set(curr.curr_idx.pos_idx);
-        if (!curr.visited.isSet(leaf.a_idx.pos_idx)) {
-            // try queue.append(.{ .curr_idx = leaf.a_idx, .dist = curr.dist + leaf.a_dist, .visited = curr.visited });
-            fastArrayListAppend(Path(max_positions, Index, DistInt), &queue, .{ .curr_idx = leaf.a_idx, .dist = curr.dist + leaf.a_dist, .visited = curr.visited });
-        }
-        if (!curr.visited.isSet(leaf.b_idx.pos_idx)) {
-            // try queue.append(.{ .curr_idx = leaf.b_idx, .dist = curr.dist + leaf.b_dist, .visited = curr.visited });
-            fastArrayListAppend(Path(max_positions, Index, DistInt), &queue, .{ .curr_idx = leaf.b_idx, .dist = curr.dist + leaf.b_dist, .visited = curr.visited });
-        }
-        if (!curr.visited.isSet(leaf.c_idx.pos_idx)) {
-            // try queue.append(.{ .curr_idx = leaf.c_idx, .dist = curr.dist + leaf.c_dist, .visited = curr.visited });
-            fastArrayListAppend(Path(max_positions, Index, DistInt), &queue, .{ .curr_idx = leaf.c_idx, .dist = curr.dist + leaf.c_dist, .visited = curr.visited });
+            var seen = path.seen;
+
+            if (seen.isSet(idx)) continue;
+            seen.set(idx);
+
+            queue.appendAssumeCapacity(.{
+                .curr = directed[idx],
+                .seen = seen,
+                .dist = path.dist + distance[path.curr_idx][idx],
+                .curr_idx = idx,
+            });
         }
     }
 
     return best - 1; // Account for off-by-one in path from start to first split
-}
-
-// Inlines ArrayList appension + ignores the errors
-inline fn fastArrayListAppend(comptime T: type, list: *std.ArrayList(T), item: T) void {
-    list.ensureTotalCapacity(list.items.len + 1) catch unreachable;
-
-    const new_item_ptr = list.addOneAssumeCapacity();
-    new_item_ptr.* = item;
 }
 
 // Useful stdlib functions
