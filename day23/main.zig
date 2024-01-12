@@ -286,6 +286,9 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
         var mask = path.curr.mask;
         try queue.ensureUnusedCapacity(@popCount(mask));
 
+        // Remove already visited
+        mask &= ~path.seen.mask;
+
         // Move the if statement out of the loop
         if (mask & end_idx_mask != 0) {
             mask ^= end_idx_mask;
@@ -295,12 +298,12 @@ pub fn solve(comptime part: Part, in: []const u8, allocator: Allocator) !u64 {
 
         while (mask != 0) {
             const idx = @ctz(mask);
-            mask ^= @as(@TypeOf(mask), 1) << @intCast(idx);
+            const curr_mask = @as(@TypeOf(mask), 1) << @intCast(idx);
+
+            mask ^= curr_mask;
 
             var seen = path.seen;
-
-            if (seen.isSet(idx)) continue;
-            seen.set(idx);
+            seen.mask |= curr_mask;
 
             queue.appendAssumeCapacity(.{
                 .curr = directed[idx],
