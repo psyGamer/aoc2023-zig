@@ -81,7 +81,8 @@ pub fn solve(in: []const u8, allocator: Allocator) !u64 {
     }
 
     var seed: u64 = undefined;
-    try std.os.linux.getrandom(std.mem.asBytes(&seed));
+    const seed_buf = std.mem.asBytes(&seed);
+    _ = std.c.getrandom(seed_buf.ptr, seed_buf.len, 0);
 
     var rng = std.rand.Xoroshiro128.init(seed);
 
