@@ -26,8 +26,8 @@ const day23 = @import("day23/main.zig");
 const day24 = @import("day24/main.zig");
 const day25 = @import("day25/main.zig");
 
-pub const std_options = struct {
-    pub const log_level = .info;
+pub const std_options: std.Options = .{
+    .log_level = .info,
 };
 
 pub fn main() !void {

@@ -13,8 +13,8 @@ const example2 = @embedFile("example2.txt");
 const Array2D = @import("array2d.zig").Array2D;
 const Part = enum { one, two };
 
-pub const std_options = struct {
-    pub const log_level = .info;
+pub const std_options: std.Options = .{
+    .log_level = .info,
 };
 
 pub fn main() !void {

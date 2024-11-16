@@ -13,8 +13,8 @@ const Array2D = @import("array2d.zig").Array2D;
 const Array3D = @import("array3d.zig").Array3D;
 const Part = enum { one, two };
 
-pub const std_options = struct {
-    pub const log_level = .info;
+pub const std_options: std.Options = .{
+    .log_level = .info,
 };
 
 pub fn main() !void {

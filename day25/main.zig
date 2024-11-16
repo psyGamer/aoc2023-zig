@@ -11,8 +11,8 @@ pub const input = @embedFile("input.txt");
 const example1 = @embedFile("example1.txt");
 const example2 = @embedFile("example2.txt");
 
-pub const std_options = struct {
-    pub const log_level = .info;
+pub const std_options: std.Options = .{
+    .log_level = .info,
 };
 
 pub fn main() !void {
@@ -81,7 +81,7 @@ pub fn solve(in: []const u8, allocator: Allocator) !u64 {
     }
 
     var seed: u64 = undefined;
-    try std.os.getrandom(std.mem.asBytes(&seed));
+    try std.os.linux.getrandom(std.mem.asBytes(&seed));
 
     var rng = std.rand.Xoroshiro128.init(seed);
 

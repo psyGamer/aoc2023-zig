@@ -10,8 +10,8 @@ const example1 = @embedFile("example1.txt");
 
 const Part = enum { one, two };
 
-pub const std_options = struct {
-    pub const log_level = .info;
+pub const std_options: std.Options = .{
+    .log_level = .info,
 };
 
 pub fn main() !void {
